@@ -18,6 +18,7 @@ use std::sync::Arc;
 use futures::stream::StreamExt;
 use serde_json::json;
 
+use crate::budget::{estimate_tokens, TokenMeter};
 use crate::core::{Attempt, Conversation};
 use crate::traits::{Buff, Detector, Generator, Harness, Probe};
 use crate::Result;
@@ -51,11 +52,20 @@ impl Default for AdaptiveConfig {
 pub struct AdaptiveHarness {
     buffs: Vec<Arc<dyn Buff>>,
     cfg: AdaptiveConfig,
+    meter: Arc<TokenMeter>,
 }
 
 impl AdaptiveHarness {
+    /// New harness with an unlimited token budget.
     pub fn new(buffs: Vec<Arc<dyn Buff>>, cfg: AdaptiveConfig) -> Self {
-        Self { buffs, cfg }
+        Self { buffs, cfg, meter: Arc::new(TokenMeter::unlimited()) }
+    }
+
+    /// New harness sharing a [`TokenMeter`] (pass the SAME meter to a
+    /// [`crate::budget::MeteredGenerator`] so baseline and adaptive calls both
+    /// count). The search stops once the budget is exhausted.
+    pub fn with_meter(buffs: Vec<Arc<dyn Buff>>, cfg: AdaptiveConfig, meter: Arc<TokenMeter>) -> Self {
+        Self { buffs, cfg, meter }
     }
 }
 
@@ -128,6 +138,8 @@ async fn eval_candidate(
     cand.metadata.insert("success_rate".into(), json!(successes as f64 / n as f64));
     let bypass = cand.max_score() > BYPASS_THRESHOLD;
     cand.metadata.insert("bypass".into(), json!(bypass));
+    let toks = estimate_tokens(&text) + cand.outputs.iter().map(|o| estimate_tokens(o)).sum::<u64>();
+    cand.metadata.insert("tokens".into(), json!(toks));
     cand
 }
 
@@ -153,6 +165,9 @@ impl Harness for AdaptiveHarness {
                         let max = score_attempt(&mut a, detectors).await;
                         let bypass = max > BYPASS_THRESHOLD;
                         a.metadata.insert("bypass".into(), json!(bypass));
+                        let toks = estimate_tokens(&a.prompt)
+                            + a.outputs.iter().map(|o| estimate_tokens(o)).sum::<u64>();
+                        a.metadata.insert("tokens".into(), json!(toks));
                         if !bypass {
                             seeds_to_expand.push(a.clone());
                         }
@@ -170,11 +185,17 @@ impl Harness for AdaptiveHarness {
 
         // --- Adaptive search per blocked seed --------------------------------
         for seed in seeds_to_expand {
+            if self.meter.exhausted() {
+                break; // token budget spent — stop gracefully
+            }
             let mut frontier: Vec<Attempt> = vec![seed];
             let mut best: Option<Attempt> = None;
             let mut found = false;
 
             for depth in 0..self.cfg.max_depth {
+                if self.meter.exhausted() {
+                    break;
+                }
                 // Generate candidates: each frontier attempt × each buff.
                 let mut candidates: Vec<Attempt> = Vec::new();
                 for f in &frontier {

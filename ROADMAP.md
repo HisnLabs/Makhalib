@@ -200,7 +200,7 @@ Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to 
 - [ ] P8 Governance & budget (audit log, allowlist, cost caps)
 - [ ] P9 Supply-chain / model-artifact scanning (pickle, weight-poisoning)
 - [x] **V0.0.1 — COV-13 adaptive guardrail-bypass vs Guardrino** (buffs + target + adaptive harness + export + CLI; run live) ✅
-- [ ] P10 Token metering & budget (per-level count, `--token-limit` hard cap, estimate)
+- [x] **P10 Token metering & budget** — per-attempt token count, `--token-limit` hard cap + pre-run estimate, metered generator ✅
 - [ ] P11 Speed & token benchmarks (fastest libs, payload compression)
 - [ ] P12 Document & multimodal attacks (PDF, image steganography, hidden-in-plain-sight)
 - [ ] P13 Threat-intel feed (arXiv + zero-day disclosures → probe catalog)

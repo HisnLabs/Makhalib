@@ -14,6 +14,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use makhalib::adaptive::{AdaptiveConfig, AdaptiveHarness};
+use makhalib::budget::{MeteredGenerator, TokenMeter};
 use makhalib::buffs;
 use makhalib::core::{Attempt, Conversation};
 use makhalib::guardrail::{GuardrailBypassDetector, GuardrailGenerator};
@@ -52,6 +53,9 @@ enum Cmd {
         /// Max concurrent target calls.
         #[arg(long, default_value_t = 8)]
         concurrency: usize,
+        /// Token budget (estimated); 0 = unlimited. The run stops when hit.
+        #[arg(long = "token-limit", default_value_t = 0)]
+        token_limit: u64,
         /// Optional seeds YAML ({seeds: [{category, text}]}); defaults are built in.
         #[arg(long)]
         seeds: Option<PathBuf>,
@@ -133,7 +137,7 @@ fn now_stamp() -> String {
 async fn main() -> makhalib::Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Redteam { endpoint, out, scope, runs, max_depth, beam, concurrency, seeds } => {
+        Cmd::Redteam { endpoint, out, scope, runs, max_depth, beam, concurrency, token_limit, seeds } => {
             let scope = match scope {
                 Some(s) if !s.trim().is_empty() => s,
                 _ => {
@@ -159,12 +163,24 @@ async fn main() -> makhalib::Result<()> {
             );
             println!("authorization scope: {scope}");
 
-            let gen: Arc<dyn Generator> = Arc::new(GuardrailGenerator::new("guardrail.Guardrail", &endpoint));
+            // Rough pre-run estimate of the baseline cost.
+            let est_baseline: u64 = seed_list
+                .iter()
+                .map(|s| makhalib::budget::estimate_tokens(&s.text) * 2)
+                .sum();
+            println!(
+                "estimated baseline ~{est_baseline} tokens · budget {}",
+                if token_limit == 0 { "unlimited".to_string() } else { format!("{token_limit}") }
+            );
+
+            let meter = Arc::new(TokenMeter::new(token_limit));
+            let base: Arc<dyn Generator> = Arc::new(GuardrailGenerator::new("guardrail.Guardrail", &endpoint));
+            let gen: Arc<dyn Generator> = Arc::new(MeteredGenerator::new(base, meter.clone()));
             let probes: Vec<Arc<dyn Probe>> = vec![Arc::new(SeedsProbe { seeds: seed_list })];
             let detectors: Vec<Arc<dyn Detector>> = vec![Arc::new(GuardrailBypassDetector::default())];
             let buff_set: Vec<Arc<dyn Buff>> = buffs::all_buffs();
             let cfg = AdaptiveConfig { runs, max_depth, beam, concurrency, keep_all: false };
-            let harness = AdaptiveHarness::new(buff_set, cfg);
+            let harness = AdaptiveHarness::with_meter(buff_set, cfg, meter.clone());
 
             let attempts = harness.run(gen, &probes, &detectors).await?;
 
@@ -185,6 +201,14 @@ async fn main() -> makhalib::Result<()> {
             let rate = if total > 0 { 100.0 * bypassed as f64 / total as f64 } else { 0.0 };
             println!("\n=== result ===");
             println!("attempts: {total} · bypasses: {bypassed} · bypass rate: {rate:.1}%");
+            let budget_note = if meter.exhausted() {
+                format!(" / {} (budget reached — run stopped early)", meter.limit())
+            } else if meter.limit() > 0 {
+                format!(" / {}", meter.limit())
+            } else {
+                String::new()
+            };
+            println!("tokens used (est): {}{}", meter.used(), budget_note);
             for p in paths {
                 println!("  wrote {}", p.display());
             }
