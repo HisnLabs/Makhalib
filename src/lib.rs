@@ -11,6 +11,8 @@
 pub mod adaptive;
 pub mod budget;
 pub mod buffs;
+pub mod carrier;
+pub mod catalog;
 pub mod core;
 pub mod detectors;
 pub mod efficacy;
@@ -19,6 +21,7 @@ pub mod governance;
 pub mod guardrail;
 pub mod harden;
 pub mod inspect;
+pub mod judge;
 pub mod llm;
 pub mod artifact;
 pub mod intel;

@@ -199,7 +199,7 @@ Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to 
 - [x] Probe / detector / generator layers (data-driven) *(tested; 107 tests green)*
 - [x] P2 NL planner — NL → ScanPlan via any LLM provider, validated; rejects unknown targets, probes, detectors and buffs; `makhalib plan` ✅
 - [~] P4 Targets — ✅ mock, Ollama, guardrail `/classify`, gateway `/v1/inspect` (L1+L2); ⬜ OpenAI/Anthropic as targets, generic REST, agents/MCP, multimodal
-- [~] P5 Catalog — ✅ 10 evasion buffs, secret/PII detectors; ⬜ generative probes, LLM-judge, toxicity, dedup/triage, YAML catalog loader
+- [~] P5 Catalog — ✅ augustus-format catalog loader (operator-supplied directory, Apache-2.0 attribution, no payloads copied into the repo), LLM judge; ⬜ generative probes, toxicity detector, dedup/triage
 - [ ] P6 Brain + semantic memory + resumable multiturn
 - [~] P7 Reporting — ✅ jsonl/json/md/csv export, severity matrix, **efficacy scorecard (bypass + over-block)**, CI gates; ⬜ OWASP/ATLAS mapping, coverage model, with/without differential
 - [~] P8 Governance — ✅ authorization gate, token/cost caps, **target allowlist** (refuses unlisted hosts before any request), **tamper-evident SHA-256 audit log with per-run token accounting**; ⬜ actor identity from SSO, log export/SIEM
@@ -207,7 +207,7 @@ Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to 
 - [x] **V0.0.1 — COV-13 adaptive guardrail-bypass vs Guardrino** (buffs + target + adaptive harness + export + CLI; run live) ✅
 - [x] **P10 Token metering & budget** — per-attempt token count, `--token-limit` hard cap + pre-run estimate, metered generator ✅
 - [ ] P11 Speed & token benchmarks (fastest libs, payload compression)
-- [ ] P12 Document & multimodal attacks (PDF, image steganography, hidden-in-plain-sight)
+- [~] P12 Document & multimodal — ✅ canary carriers (plain, invisible-character, PDF, PNG text chunk) for testing whether hidden text is read; ⬜ image/PDF extraction targets; no steganographic payloads by design
 - [~] P13 Threat-intel feed — ✅ feed validation, dedupe, merge and staleness (`intel` module); ⬜ CLI wiring, scheduled fetch, probe-spec synthesis
 - [ ] P14 Malware & artifact signature DB (YARA)
 - [ ] P15 Redis vector memory (resumable, persistent campaigns)

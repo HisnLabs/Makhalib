@@ -130,6 +130,19 @@ enum Cmd {
         /// The request, e.g. "test my guardrail for injection, be thorough".
         request: String,
     },
+    /// List probes from an augustus-format catalog directory (metadata only, no prompt text).
+    Catalog {
+        /// Directory of augustus-style YAML probes (e.g. a checkout of augustus templates/).
+        #[arg(long)]
+        dir: PathBuf,
+    },
+    /// Write canary carrier files (plain, invisible, PDF, PNG) to test whether text is read.
+    Carriers {
+        #[arg(long, default_value = "CANARY-TEST-0001")]
+        canary: String,
+        #[arg(long, default_value = "out/carriers")]
+        out: PathBuf,
+    },
     /// Serve the read-only results dashboard for exported runs.
     Ui {
         #[arg(long, default_value_t = 8088)]
@@ -654,6 +667,27 @@ async fn main() -> makhalib::Result<()> {
             })?;
             let plan = makhalib::planner::plan_from_request(brain.as_ref(), &request).await?;
             println!("{}", makhalib::planner::render_plan_yaml(&plan)?);
+            Ok(())
+        }
+        Cmd::Catalog { dir } => {
+            let (entries, rejected) = makhalib::catalog::load_dir(&dir);
+            println!("{} probes loaded, {} rejected", entries.len(), rejected.len());
+            for e in &entries {
+                println!("{:<40} detector={:<22} severity={:<8} prompts={}", e.id, e.detector, e.severity, e.prompts.len());
+            }
+            for (file, reason) in &rejected {
+                eprintln!("rejected {file}: {reason}");
+            }
+            Ok(())
+        }
+        Cmd::Carriers { canary, out } => {
+            std::fs::create_dir_all(&out)?;
+            for (i, c) in makhalib::carrier::all_carriers(&canary).iter().enumerate() {
+                let path = out.join(format!("carrier-{i}-{:?}.{}", c.kind, c.kind.extension()));
+                std::fs::write(&path, &c.bytes)?;
+                println!("wrote {} (canary readable by naive extractor: {})", path.display(),
+                    makhalib::carrier::canary_recoverable(&c.bytes, &canary));
+            }
             Ok(())
         }
         Cmd::Ui { port, reports, dist } => {
