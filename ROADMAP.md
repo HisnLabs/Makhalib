@@ -158,6 +158,33 @@ F-beta, ROC, judge reliability).
 **TDD discipline:** red (failing test) → green (minimal impl) → refactor, every module.
 Honesty gate: reported results reflect the real `cargo test` output.
 
+## V0.1 → V1.0 expansion (customer-driven)
+
+Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to run, and always current.
+
+- **P10 — Token metering & budget.** Live **token count at every level** (per attempt, per seed, per
+  run), a user-set **`--token-limit` hard cap** with a **pre-run estimate** and a graceful stop when
+  the budget is hit, and per-run cost. No surprise bills. *(extends #5)*
+- **P11 — Speed & token benchmarks.** A reproducible bench suite publishing **ms/attempt,
+  tokens/attempt, bypasses per 1k tokens, and throughput**; regression-tracked. Engineering rule:
+  pick the **fastest Rust libs** (e.g. `rapidhash`/`ahash`, `simd-json`, `smallvec`, `bytes`) and
+  **compress payloads** (short encodings, dedupe, template reuse) so each attack costs fewer tokens.
+- **P12 — Document & multimodal attacks.** **PDF-borne injection**, **image steganography** (hidden
+  text/LSB in images for vision targets), and **hidden-in-plain-sight** carriers (zero-width,
+  homoglyph, whitespace, file metadata, HTML comments) as first-class probes/buffs. *(COV-02, COV-12)*
+- **P13 — Threat-intel feed.** Ingest the **latest arXiv LLM-attack papers** and public
+  **jailbreak/zero-day disclosures** into the probe catalog on a schedule, so customers are tested
+  against fresh techniques — a living attack database, curated as data.
+- **P14 — Malware & artifact signature DB.** A **YARA/signature database** for model-artifact and
+  skill scanning (malicious pickle, backdoor triggers, typosquats), updatable. *(extends P9, COV-09/18)*
+- **P15 — Redis vector memory.** A **Redis + vector** backend for the semantic memory (P6):
+  embeddings of every attempt/outcome for adaptive recall and **resumable, persistent campaigns**
+  across runs and machines.
+
+> Defensive add-ons under evaluation: shipping Makhalib's guardrail-hardening guidance as **Claude
+> Skills + an MCP server + an agent** so a defender can wire Makhalib's findings straight into
+> their own guardrail/agent pipeline.
+
 ## Status
 - [x] P0 Foundation — domain types, typed registry *(tested)*
 - [x] P1 Plan keystone — `ScanPlan` + authorization gate *(tested)*
@@ -170,3 +197,10 @@ Honesty gate: reported results reflect the real `cargo test` output.
 - [ ] P7 Actionable reporting (OWASP/ATLAS, coverage) + **guardrail efficacy scorecard** + CI mode
 - [ ] P8 Governance & budget (audit log, allowlist, cost caps)
 - [ ] P9 Supply-chain / model-artifact scanning (pickle, weight-poisoning)
+- [x] **V0.0.1 — COV-13 adaptive guardrail-bypass vs Guardrino** (buffs + target + adaptive harness + export + CLI; run live) ✅
+- [ ] P10 Token metering & budget (per-level count, `--token-limit` hard cap, estimate)
+- [ ] P11 Speed & token benchmarks (fastest libs, payload compression)
+- [ ] P12 Document & multimodal attacks (PDF, image steganography, hidden-in-plain-sight)
+- [ ] P13 Threat-intel feed (arXiv + zero-day disclosures → probe catalog)
+- [ ] P14 Malware & artifact signature DB (YARA)
+- [ ] P15 Redis vector memory (resumable, persistent campaigns)

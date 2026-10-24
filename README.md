@@ -7,8 +7,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-57%20passing-brightgreen.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/status-early%20development-yellow.svg" alt="Status">
+  <img src="https://img.shields.io/badge/tests-87%20passing-brightgreen.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/status-early%20development-yellow.svg" alt="Status"> <img src="https://img.shields.io/badge/v0.0.1-runs%20live-success.svg" alt="v0.0.1">
   <img src="https://img.shields.io/badge/engine-Rust-orange.svg" alt="Built in Rust">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0">
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome">
@@ -44,24 +44,30 @@ overhead they add.
 > control. **Authorized security testing only:** use it exclusively against systems you own or have
 > explicit written permission to test. Every plan carries a mandatory authorization gate.
 
-<p align="center">
-  <br>
-  <code>$ makhalib "test my local ollama llama3 for jailbreaks and prompt injection, be thorough"</code>
-</p>
+<p align="center"><b>✅ V0.0.1 is live</b> — adaptive guardrail-bypass (COV-13) against any HTTP <code>/classify</code> endpoint, with exportable findings.</p>
 
-```text
-  makhalib · compiling intent ───────────────────────────────────────────────
-  ✓ target        ollama · llama3 · http://localhost:11434
-  ✓ authorization  "my own Ollama instance"  (gate satisfied)
-  ✓ plan           17 probes · 3 detectors · probewise · concurrency 8
-  ─ running ──────────────────────────────────────────────────────────────────
-  [▰▰▰▰▰▰▰▰▱▱] 128/160 attempts   3 vulnerable · 125 passed
-  → finding   jailbreak.roleplay      severity HIGH    OWASP LLM01
-  → finding   injection.indirect      severity MED     OWASP LLM01 · ATLAS AML.T0051
+```console
+$ makhalib redteam --endpoint http://localhost:8810/classify \
+      --scope "my own guardrail (authorized)" --max-depth 3 --beam 4
+
+makhalib redteam · 12 seeds · adaptive(depth=3, beam=4) · authorized ✓
+─ searching ─────────────────────────────────────────────────────────
+=== result ===
+attempts: 23 · bypasses: 11 · bypass rate: 47.8%
+
+By mutation (obfuscation)       By category
+  reverse      100%   (3/3)       prompt_extraction  50%
+  leetspeak    100%   (1/1)       direct_injection   50%
+  rot13         86%   (6/7)       indirect_injection 40%
+  base64         0%   (0/2)  ← caught
+
+  wrote out/.../summary.md  findings.csv  results.json  results.jsonl
 ```
 
-> _CLI output above illustrates the target experience; see [`ROADMAP.md`](./ROADMAP.md) for what is
-> implemented today vs. in progress._
+> The adaptive search mutates known-blocked attacks and **hill-climbs on the guardrail's own
+> score** until one slips through — the class of attack most likely to break a filter. Findings
+> export straight into your report & review list. *(Example output; run your own — see
+> [`ROADMAP.md`](./ROADMAP.md) for what else is in flight.)*
 
 ---
 
@@ -152,11 +158,23 @@ flowchart LR
 ```sh
 git clone https://github.com/HisnLabs/Makhalib.git
 cd Makhalib
-cargo build          # single static binary
-cargo test           # 57 tests, fully offline & deterministic
+cargo build --release     # single static binary
+cargo test                # 87 tests, fully offline & deterministic
 ```
 
-**2. Write a plan** — the declarative artifact every scan runs from. Save as `plan.yaml`:
+**2. Red-team a guardrail (V0.0.1, live)** — point it at any HTTP `/classify` endpoint you own:
+
+```sh
+makhalib redteam \
+  --endpoint http://localhost:8810/classify \
+  --scope "my own guardrail (authorized)" \
+  --max-depth 3 --beam 4 --out out/run-1
+# -> out/run-1/{summary.md, findings.csv, results.json, results.jsonl}
+```
+
+Endpoint contract: `POST {"text": "..."}` → `{"score", "attack", "threshold", "categories"}`.
+
+**3. Write a plan** — the declarative artifact every scan runs from. Save as `plan.yaml`:
 
 ```yaml
 version: "1"
