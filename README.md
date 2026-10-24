@@ -24,7 +24,7 @@
 
 ---
 
-# Makhalib — _describe the attack, don't code it_
+# Makhalib — 🦅 مخالب _describe the attack, don't code it_
 
 **Makhalib** (مخالب, _"claws"_) is a natural-language-driven red-teaming framework for the whole AI
 safety stack — **the model, the guardrails around it, or the full pipeline.** It brings together the
