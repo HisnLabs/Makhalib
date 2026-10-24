@@ -11,6 +11,7 @@
 pub mod adaptive;
 pub mod budget;
 pub mod buffs;
+pub mod detect_base;
 pub mod carrier;
 pub mod catalog;
 pub mod core;
