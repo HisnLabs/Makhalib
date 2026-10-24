@@ -120,5 +120,8 @@ an operator-supplied augustus checkout at run time.
 | YAML probe templates | `catalog`, `catalog-convert` | ✅ loader and conversion |
 | Multi-turn strategies (Crescendo, GOAT, Hydra) | `multiturn` (replay only) | ⬜ escalation logic not built by design |
 | Go-coded probes | — | ⬜ not ported (payloads stay in the augustus checkout) |
-| `toxiccomment`, `unsafecontent`, `shields`, `judge` | — | ⬜ next candidates for detector ports |
+| `toxiccomment` | `detect_toxic` | ✅ ported (substring scoring; slur entries left for the caller to add) |
+| `unsafecontent` | `detect_unsafe` | ✅ ported (word, substring and startswith; lexicons supplied by the caller) |
+| `shields` (Up / Down) | `detect_shields` | ✅ ported (startswith scoring) |
+| `judge` (Judge / Refusal) | `detect_judge` | ✅ ported (LLM rubric written in our own words; registered with a caller-supplied client) |
 
