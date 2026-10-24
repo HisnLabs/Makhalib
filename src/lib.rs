@@ -18,6 +18,7 @@ pub mod generators;
 pub mod guardrail;
 pub mod harden;
 pub mod inspect;
+pub mod llm;
 pub mod plan;
 pub mod probes;
 pub mod registry;

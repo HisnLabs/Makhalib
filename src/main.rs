@@ -87,6 +87,22 @@ enum Cmd {
         #[arg(long)]
         scope: Option<String>,
     },
+    /// Ask the configured LLM a single prompt — smoke-test the brain's provider
+    /// (ollama | openai | anthropic | gemini | openai-compatible).
+    Ask {
+        #[arg(long, default_value = "ollama")]
+        provider: String,
+        #[arg(long)]
+        model: String,
+        #[arg(long)]
+        base_url: Option<String>,
+        #[arg(long)]
+        host: Option<String>,
+        #[arg(long)]
+        system: Option<String>,
+        /// The user prompt.
+        prompt: String,
+    },
 }
 
 #[derive(Deserialize)]
@@ -388,6 +404,20 @@ async fn main() -> makhalib::Result<()> {
                 println!("  {m:<18} catches {n}");
             }
             println!("  wrote {}", path.display());
+            Ok(())
+        }
+        Cmd::Ask { provider, model, base_url, host, system, prompt } => {
+            let cfg = makhalib::llm::LlmConfig {
+                provider,
+                model,
+                base_url,
+                host,
+                api_key: None,
+                api_key_env: None,
+            };
+            let client = makhalib::llm::build(&cfg)?;
+            let reply = client.chat(system.as_deref(), &prompt).await?;
+            println!("{reply}");
             Ok(())
         }
     }
