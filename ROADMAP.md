@@ -87,7 +87,7 @@ The reasons people adopt these tools and then leave, and where Makhalib stands o
 | Harnesses / multiturn | `harnesses/`, `multiturn/` | `harnesses` | **YAML spec** |
 | **Engine (concurrent)** | `pkg/scanner` | `scanner` — bounded worker pool, streaming results, backpressure; **memory-efficient, multithreaded** (no whole-run buffering) | flags/plan |
 | Output | `pkg/output` | `report` | — |
-| **Brain (LLM-as-DNA)** | — (PyRIT splits across code) | `brain` — one model backing attacker / planner / judge | — |
+| **Brain (LLM-as-DNA)** | — (PyRIT splits across code) | `brain` — one **provider-agnostic** model backing attacker / planner / judge (Ollama · OpenAI · Anthropic/Claude · Google/Gemini · any OpenAI-compatible) | — |
 | **Semantic memory** | PyRIT `memory` (relational) | `memory` — embeddings store; feedback recall steers each turn | — |
 | **NL planner** | — | `planner` (LLM-backed, Ollama/Anthropic) | — |
 | CLI | `cmd/augustus` | `cli` (`scan`, `plan`, `list`, `version`) | — |
@@ -119,7 +119,9 @@ F-beta, ROC, judge reliability).
 - **P1 — The plan keystone.** `ScanPlan` schema with authorization gate, declarative target/probe/
   detector/harness specs; YAML round-trip; validation. This is the contract every other layer
   speaks. *Pure, offline.*
-- **P2 — NL planner (LLM-backed).** NL → `ScanPlan` via an LLM (Ollama local first) emitting
+- **P2 — NL planner (provider-agnostic LLM).** A single `LlmClient` abstraction backs the brain
+  across **Ollama, OpenAI, Anthropic (Claude), Google (Gemini) and any OpenAI-compatible endpoint**
+  (provider chosen by config/env; keys from env). NL → `ScanPlan` via an LLM (Ollama local first) emitting
   strict JSON; schema-validated; `plan` subcommand shows the compiled plan for review. Tested with
   a **mock LLM client** returning canned JSON + deterministic schema validation.
 - **P3 — Engine (concurrent, memory-efficient).** `traits`, mock generator, deterministic detector,
@@ -139,7 +141,8 @@ F-beta, ROC, judge reliability).
   emoji / base64 obfuscation) and **output detectors** for secret/API-key leaks, PII and toxicity.
   *(Shipped: `secrets.Secrets` gitleaks-style ruleset, `secrets.Gitleaks` external-CLI detector, and
   `pii.PII` with Luhn-checked cards.)*
-- **P6 — Brain + semantic memory + resumable multiturn.** `brain` (LLM-as-DNA) backing
+- **P6 — Brain + semantic memory + resumable multiturn.** `brain` (LLM-as-DNA, any provider — see
+  P2's `LlmClient`: Ollama/OpenAI/Anthropic/Gemini/OpenAI-compatible) backing
   attacker/planner/judge; `memory` embeddings store; attacker/target/judge orchestrator whose each
   turn is steered by semantic recall of prior feedback (#2); memory **persisted per engagement so a
   campaign resumes**, with rate-limit/retry decorators (#10).
@@ -194,7 +197,7 @@ Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to 
 - [x] P1 Plan keystone — `ScanPlan` + authorization gate *(tested)*
 - [x] P3 Engine — `Probewise` concurrent harness *(tested)*
 - [x] Probe / detector / generator layers (data-driven) *(tested; 57 tests green)*
-- [ ] P2 NL planner (LLM-backed, Ollama first)
+- [ ] P2 NL planner — provider-agnostic brain (Ollama/OpenAI/Anthropic/Gemini/OpenAI-compatible)
 - [ ] P4 Real targets — LLMs, **guardrails & pipelines**, agents/MCP, multimodal
 - [ ] P5 Data catalog + generative probes + LLM-judge + encoding-evasion buffs + secret/PII/toxicity detectors
 - [ ] P6 Brain + semantic memory + resumable multiturn
@@ -208,4 +211,4 @@ Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to 
 - [ ] P13 Threat-intel feed (arXiv + zero-day disclosures → probe catalog)
 - [ ] P14 Malware & artifact signature DB (YARA)
 - [ ] P15 Redis vector memory (resumable, persistent campaigns)
-- [ ] P16 Defender (Skill + MCP + agent) — find → fix → re-verify loop (spec: docs/DEFENDER.md)
+- [~] P16 Defender — `harden` verify-the-fix (normalize-then-classify, live-projected) ✅; MCP server + agent remain (spec: docs/DEFENDER.md)
