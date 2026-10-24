@@ -329,6 +329,27 @@ makhalib watch --run out/<run>            # follow a run from another terminal
 makhalib ui --port 8088 --reports out     # dashboard with a live attack feed
 ```
 
+### 11. Use the augustus probe catalog (`catalog`, `catalog-convert`)
+
+Makhalib reads probes in the [augustus](https://github.com/praetorian-inc/augustus) YAML format
+(Apache-2.0). You point it at your own checkout of augustus, and **the probe text is never copied
+into this repository**: it stays in your checkout and the commands read it at run time.
+
+```sh
+# List what is in the catalog. Shows id, detector, severity and prompt count, not the prompt text.
+makhalib catalog --dir path/to/augustus/templates
+
+# Convert the catalog into Makhalib's native probe specs, written to a local directory.
+makhalib catalog-convert --from path/to/augustus/templates --out out/catalog-native
+```
+
+- `out/` is gitignored, so converted specs stay on your machine.
+- Files that fail to parse are reported with a reason and skipped, and the rest still load.
+- Only the YAML templates load this way. Many augustus probes are Go code rather than YAML, and
+  those are not converted.
+- Converted specs load through the same loader as built-in probes, with the detector named in
+  the original template.
+
 ### CLI reference
 
 | Flag | Default | Meaning |
