@@ -22,6 +22,7 @@ pub mod inspect;
 pub mod llm;
 pub mod plan;
 pub mod probes;
+pub mod progress;
 pub mod registry;
 pub mod report;
 pub mod scanner;

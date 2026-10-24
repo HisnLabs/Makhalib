@@ -319,6 +319,16 @@ makhalib ask --provider openai    --model <gpt-model>    "…"    # needs OPENAI
 
 Any OpenAI-compatible server (OpenRouter, vLLM, LM Studio) works with `--provider openai-compatible --base-url …`.
 
+### 10. Watch a run live (CLI or dashboard)
+
+Every run prints each attempt as it happens: phase, score, bypass or blocked, tokens for that call,
+the running total against the budget, and the guardrail's decision. The same events feed the dashboard.
+
+```sh
+makhalib watch --run out/<run>            # follow a run from another terminal
+makhalib ui --port 8088 --reports out     # dashboard with a live attack feed
+```
+
 ### CLI reference
 
 | Flag | Default | Meaning |

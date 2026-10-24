@@ -93,6 +93,15 @@ enum Cmd {
         #[arg(long)]
         scope: Option<String>,
     },
+    /// Follow a run's live progress in the terminal (use from another shell).
+    Watch {
+        /// Run output directory (containing progress.jsonl).
+        #[arg(long)]
+        run: PathBuf,
+        /// Poll interval in milliseconds.
+        #[arg(long, default_value_t = 500)]
+        interval_ms: u64,
+    },
     /// Serve the read-only results dashboard for exported runs.
     Ui {
         #[arg(long, default_value_t = 8088)]
@@ -275,7 +284,26 @@ async fn main() -> makhalib::Result<()> {
             let _ = std::fs::remove_file(&progress_path);
             let harness = AdaptiveHarness::with_meter(buff_set, cfg, meter.clone()).with_progress(progress_path);
 
-            let attempts = harness.run(gen.clone(), &probes, &detectors).await?;
+            let live_path = out.join("progress.jsonl");
+            let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let done_flag = done.clone();
+            let printer = std::thread::spawn(move || {
+                let mut since = 0usize;
+                loop {
+                    for e in makhalib::progress::read_events(&live_path, since) {
+                        println!("{}", makhalib::progress::format_event(&e));
+                        since += 1;
+                    }
+                    if done_flag.load(std::sync::atomic::Ordering::SeqCst) {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(250));
+                }
+            });
+            let attempts = harness.run(gen.clone(), &probes, &detectors).await;
+            done.store(true, std::sync::atomic::Ordering::SeqCst);
+            let _ = printer.join();
+            let attempts = attempts?;
 
             let meta = RunMeta {
                 target: "guardrail".into(),
@@ -464,6 +492,29 @@ async fn main() -> makhalib::Result<()> {
                 println!("  {m:<18} catches {n}");
             }
             println!("  wrote {}", path.display());
+            Ok(())
+        }
+        Cmd::Watch { run, interval_ms } => {
+            let path = run.join("progress.jsonl");
+            let mut since = 0usize;
+            let mut idle = 0u32;
+            loop {
+                let events = makhalib::progress::read_events(&path, since);
+                for e in &events {
+                    println!("{}", makhalib::progress::format_event(e));
+                }
+                since += events.len();
+                if run.join("results.json").exists() && events.is_empty() {
+                    idle += 1;
+                    if idle >= 2 {
+                        break;
+                    }
+                } else {
+                    idle = 0;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(interval_ms));
+            }
+            println!("-- run finished · {since} events --");
             Ok(())
         }
         Cmd::Ui { port, reports, dist } => {
