@@ -74,6 +74,19 @@ enum Cmd {
         #[arg(long)]
         seeds: Option<PathBuf>,
     },
+    /// Project normalize-then-classify hardening on a prior run's bypasses (P16).
+    Harden {
+        #[arg(long, default_value = "http://localhost:8787/v1/inspect")]
+        endpoint: String,
+        #[arg(long, default_value = "inspect")]
+        format: String,
+        /// A prior run's output directory (containing results.jsonl).
+        #[arg(long)]
+        run: PathBuf,
+        /// REQUIRED: attestation of what you are authorized to test.
+        #[arg(long)]
+        scope: Option<String>,
+    },
 }
 
 #[derive(Deserialize)]
@@ -289,6 +302,92 @@ async fn main() -> makhalib::Result<()> {
             if max_b.is_some() || max_fb.is_some() {
                 println!("GATE: PASS");
             }
+            Ok(())
+        }
+        Cmd::Harden { endpoint, format, run, scope } => {
+            let scope = match scope {
+                Some(s) if !s.trim().is_empty() => s,
+                _ => {
+                    eprintln!("refusing: pass --scope \"<authorized scope>\"");
+                    std::process::exit(2);
+                }
+            };
+            let jsonl = std::fs::read_to_string(run.join("results.jsonl"))?;
+            let mut bypasses: Vec<(String, String)> = Vec::new();
+            for line in jsonl.lines() {
+                if line.trim().is_empty() {
+                    continue;
+                }
+                if let Ok(a) = serde_json::from_str::<makhalib::core::Attempt>(line) {
+                    if a.metadata.get("bypass").and_then(|v| v.as_bool()).unwrap_or(false) {
+                        let cat = a.metadata.get("category").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        bypasses.push((cat, a.prompt));
+                    }
+                }
+            }
+            println!("harden · {endpoint} · {format} · {} confirmed bypasses · authorized: {scope}", bypasses.len());
+
+            let gen: Arc<dyn Generator> = Arc::new(GuardrailGenerator::new("guardrail.Guardrail", &endpoint));
+            let detector: Arc<dyn Detector> = match format.as_str() {
+                "inspect" => Arc::new(makhalib::inspect::InspectBypassDetector),
+                _ => Arc::new(GuardrailBypassDetector::default()),
+            };
+
+            use std::collections::BTreeMap;
+            let mut caught = 0usize;
+            let mut by_method: BTreeMap<String, usize> = BTreeMap::new();
+            let mut residual: Vec<(String, String)> = Vec::new();
+            for (cat, text) in &bypasses {
+                let mut hit: Option<String> = None;
+                for (method, view) in makhalib::harden::normalized_views(text) {
+                    let mut a = makhalib::core::Attempt::new(view.clone());
+                    if let Ok(msgs) = gen.generate(&makhalib::core::Conversation::from_prompt(view), 1).await {
+                        a.outputs.clear();
+                        for m in msgs {
+                            a.add_output(m.content);
+                        }
+                        let scores = detector.detect(&a).await.unwrap_or_default();
+                        let max = scores.iter().copied().fold(0.0_f64, f64::max);
+                        if max <= 0.5 {
+                            hit = Some(method);
+                            break;
+                        }
+                    }
+                }
+                match hit {
+                    Some(m) => {
+                        caught += 1;
+                        *by_method.entry(m).or_default() += 1;
+                    }
+                    None => residual.push((cat.clone(), text.clone())),
+                }
+            }
+
+            let total = bypasses.len();
+            let rate = if total > 0 { 100.0 * caught as f64 / total as f64 } else { 0.0 };
+            let mut md = String::new();
+            md.push_str("# Guardrail Hardening Projection — normalize-then-classify\n\n");
+            md.push_str(&format!("- **Target:** {endpoint} ({format})\n"));
+            md.push_str(&format!("- **Confirmed bypasses:** {total}\n"));
+            md.push_str(&format!("- **Would be caught by normalize-then-classify: {caught} ({rate:.1}%)**\n\n"));
+            md.push_str("## Caught, by normalization\n\n| Normalization | Bypasses it catches |\n|---|---:|\n");
+            for (m, n) in &by_method {
+                md.push_str(&format!("| {m} | {n} |\n"));
+            }
+            md.push_str(&format!("\n## Residual — not closed by these views ({})\n\n", residual.len()));
+            for (cat, text) in &residual {
+                let t: String = text.chars().take(80).collect();
+                md.push_str(&format!("- `{cat}` — {t}\n"));
+            }
+            md.push_str("\n## Recommendation\n\nScore the **max over** {original, lower, de-leetspeak, strip-invisible, confusable-fold, reverse, rot13, base64-decode}; add a chars-per-token anomaly filter (Broken-Token) for the residual.\n");
+            let path = run.join("harden.md");
+            std::fs::write(&path, &md)?;
+            println!("\n=== hardening projection ===");
+            println!("would be caught: {caught}/{total} ({rate:.1}%)");
+            for (m, n) in &by_method {
+                println!("  {m:<18} catches {n}");
+            }
+            println!("  wrote {}", path.display());
             Ok(())
         }
     }

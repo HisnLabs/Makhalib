@@ -16,6 +16,7 @@ pub mod detectors;
 pub mod efficacy;
 pub mod generators;
 pub mod guardrail;
+pub mod harden;
 pub mod inspect;
 pub mod plan;
 pub mod probes;
