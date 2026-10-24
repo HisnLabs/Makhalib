@@ -103,6 +103,15 @@ The reasons people adopt these tools and then leave, and where Makhalib stands o
 
 ---
 
+## Integrations catalog
+
+The open-source tools, datasets and techniques we pull from — attack generation, evasion transforms,
+benchmarks, guardrails, secrets/PII/supply-chain, and metrics/methods — are catalogued, mapped to
+plug-points and phases, in [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md). It aligns with the
+HisnLabs "AI Security Testing Framework" (COV-01/02/03 coverage, OWASP/ATLAS/NIST crosswalk, agentic
+controls APE/BLR/SKL, OPA/OpenAPPA policy) and the Augustus probe/metrics deck (confusion matrix,
+F-beta, ROC, judge reliability).
+
 ## Phases (each ships green tests before the next)
 
 - **P0 — Foundation.** cargo project; `core` domain types (`Attempt`, `Conversation`, `Message`,
