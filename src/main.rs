@@ -93,6 +93,17 @@ enum Cmd {
         #[arg(long)]
         scope: Option<String>,
     },
+    /// Serve the read-only results dashboard for exported runs.
+    Ui {
+        #[arg(long, default_value_t = 8088)]
+        port: u16,
+        /// Directory containing run folders (each with results.json).
+        #[arg(long, default_value = "out")]
+        reports: PathBuf,
+        /// Built dashboard directory (run `npm run build` in ui/ first).
+        #[arg(long, default_value = "ui/dist")]
+        dist: PathBuf,
+    },
     /// Ask the configured LLM a single prompt — smoke-test the brain's provider
     /// (ollama | openai | anthropic | gemini | openai-compatible).
     Ask {
@@ -259,7 +270,10 @@ async fn main() -> makhalib::Result<()> {
             };
             let buff_set: Vec<Arc<dyn Buff>> = buffs::all_buffs();
             let cfg = AdaptiveConfig { runs, max_depth, beam, concurrency, keep_all: false };
-            let harness = AdaptiveHarness::with_meter(buff_set, cfg, meter.clone());
+            std::fs::create_dir_all(&out)?;
+            let progress_path = out.join("progress.jsonl");
+            let _ = std::fs::remove_file(&progress_path);
+            let harness = AdaptiveHarness::with_meter(buff_set, cfg, meter.clone()).with_progress(progress_path);
 
             let attempts = harness.run(gen.clone(), &probes, &detectors).await?;
 
@@ -450,6 +464,10 @@ async fn main() -> makhalib::Result<()> {
                 println!("  {m:<18} catches {n}");
             }
             println!("  wrote {}", path.display());
+            Ok(())
+        }
+        Cmd::Ui { port, reports, dist } => {
+            makhalib::ui_server::serve(port, &reports, &dist)?;
             Ok(())
         }
         Cmd::Ask { provider, model, base_url, host, system, prompt } => {

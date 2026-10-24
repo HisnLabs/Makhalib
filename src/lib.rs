@@ -26,6 +26,7 @@ pub mod registry;
 pub mod report;
 pub mod scanner;
 pub mod traits;
+pub mod ui_server;
 
 /// Boxed, thread-safe error used across async trait boundaries.
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;

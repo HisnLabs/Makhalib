@@ -53,19 +53,38 @@ pub struct AdaptiveHarness {
     buffs: Vec<Arc<dyn Buff>>,
     cfg: AdaptiveConfig,
     meter: Arc<TokenMeter>,
+    progress: Option<std::path::PathBuf>,
+}
+
+/// Appends one JSON event line to the progress log (best effort: a logging
+/// failure never stops the run).
+fn log_progress(path: &Option<std::path::PathBuf>, event: serde_json::Value) {
+    if let Some(p) = path {
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(p) {
+            let _ = writeln!(f, "{event}");
+        }
+    }
 }
 
 impl AdaptiveHarness {
     /// New harness with an unlimited token budget.
     pub fn new(buffs: Vec<Arc<dyn Buff>>, cfg: AdaptiveConfig) -> Self {
-        Self { buffs, cfg, meter: Arc::new(TokenMeter::unlimited()) }
+        Self { buffs, cfg, meter: Arc::new(TokenMeter::unlimited()), progress: None }
     }
 
     /// New harness sharing a [`TokenMeter`] (pass the SAME meter to a
     /// [`crate::budget::MeteredGenerator`] so baseline and adaptive calls both
     /// count). The search stops once the budget is exhausted.
+    /// Write one progress event per evaluated attempt to `path` as the run goes,
+    /// so a dashboard can show the search live.
+    pub fn with_progress(mut self, path: std::path::PathBuf) -> Self {
+        self.progress = Some(path);
+        self
+    }
+
     pub fn with_meter(buffs: Vec<Arc<dyn Buff>>, cfg: AdaptiveConfig, meter: Arc<TokenMeter>) -> Self {
-        Self { buffs, cfg, meter }
+        Self { buffs, cfg, meter, progress: None }
     }
 }
 
@@ -171,6 +190,17 @@ impl Harness for AdaptiveHarness {
                         if !bypass {
                             seeds_to_expand.push(a.clone());
                         }
+                        log_progress(&self.progress, json!({
+                            "phase": "baseline",
+                            "prompt": a.prompt.chars().take(160).collect::<String>(),
+                            "category": a.metadata.get("category").cloned().unwrap_or(json!("")),
+                            "score": max,
+                            "bypass": bypass,
+                            "tokens": a.metadata.get("tokens").cloned().unwrap_or(json!(0)),
+                            "tokens_used": self.meter.used(),
+                            "token_limit": self.meter.limit(),
+                            "guardrail": a.outputs.first().cloned().unwrap_or_default(),
+                        }));
                         results.push(a);
                     }
                 }
@@ -223,6 +253,20 @@ impl Harness for AdaptiveHarness {
                 .collect()
                 .await;
 
+                for c in &evaluated {
+                    log_progress(&self.progress, json!({
+                        "phase": "adaptive",
+                        "depth": depth,
+                        "prompt": c.prompt.chars().take(160).collect::<String>(),
+                        "mutations": c.metadata.get("mutations").cloned().unwrap_or(json!([])),
+                        "score": c.max_score(),
+                        "bypass": c.max_score() > BYPASS_THRESHOLD,
+                        "tokens": c.metadata.get("tokens").cloned().unwrap_or(json!(0)),
+                        "tokens_used": self.meter.used(),
+                        "token_limit": self.meter.limit(),
+                        "guardrail": c.outputs.first().cloned().unwrap_or_default(),
+                    }));
+                }
                 if self.cfg.keep_all {
                     results.extend(evaluated.iter().cloned());
                 }

@@ -1,19 +1,20 @@
 export interface RunSummary {
   name: string
+  started: string
   endpoint: string
   total: number
   bypassed: number
   bypass_rate: number
+  has_scorecard: boolean
 }
 
 export interface Finding {
   id: string
   category: string
-  seed: string
+  severity: string
+  success_rate: number
   mutations: string[]
   final_text: string
-  success_rate: number
-  severity: string
 }
 
 export interface RunReport {
@@ -28,9 +29,8 @@ export interface RunReport {
   findings: Finding[]
 }
 
-export interface Scorecard {
-  bypass_rate: number
-  over_block_rate: number
-  benign_total: number
-  over_blocked: number
+export interface RunDetail {
+  name: string
+  report: RunReport
+  scorecard: string
 }
