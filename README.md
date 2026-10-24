@@ -71,6 +71,12 @@ By mutation (obfuscation)       By category
 
 ---
 
+> ### 🤝 Open source, from HisnLabs
+> We're happy to open-source the internal tool we built for testing **Guardrino-t7**, our guardrail
+> solution, so the open-source community can use it, challenge it and improve it. We're glad to take this
+> journey to another level of contribution: the tool, the attack catalog, the detectors and the
+> documentation are all open for review. See [Contributing](#-contributing) to get started.
+
 ## 🧰 What Makhalib offers
 
 | | Capability | How |
