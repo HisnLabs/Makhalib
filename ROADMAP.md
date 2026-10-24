@@ -68,6 +68,7 @@ The reasons people adopt these tools and then leave, and where Makhalib stands o
 | 9 | **Governance / safety.** No scope enforcement, no audit trail — risky for orgs to authorize. | ✅/➕ **Authorization gate** (done) + **tamper-evident audit log + target allowlist** (P8). |
 | 10 | **No resumability.** Long runs die partway; primitive rate-limit handling. | ➕ **Persisted memory per engagement = resumable campaigns** + rate-limit/retry decorators (P6). |
 | 11 | **Sharing customizations = sharing code.** A new probe is a code PR. | ✅ **Shareable YAML spec** anyone can drop in. |
+| 12 | **Model-only scope.** garak/augustus/PyRIT test the model; the guardrails and the model artifact go untested. | ➕ **Whole-stack red-teaming**: model, **guardrails** (bypass/over-block metrics), full pipeline, and **model-artifact** scanning (P4, P7, P9). |
 
 ---
 
@@ -117,21 +118,31 @@ The reasons people adopt these tools and then leave, and where Makhalib stands o
   the mock target, offline-tested. *(fanned out to Sonnet agents against the P0/P1 contract)*
 - **P4 — Real targets (zero code).** Ollama first, then OpenAI-compat, Anthropic, generic REST,
   **tool-using agents, MCP servers, authenticated endpoints, multimodal** — all data-configured.
-  HTTP mocked in tests. *(churn-driver #4)*
+  Plus **guardrail targets** (moderation / jailbreak classifiers / prompt firewalls like Guardrino,
+  Llama Guard) and **pipeline targets** (guardrail + model composed) — a target may return a
+  `GuardrailVerdict {allow|block|flag, labels, score, latency}` instead of a completion, and the
+  scanner scores the verdict. HTTP mocked in tests. *(churn-drivers #4, #12)*
 - **P5 — Data catalog + smarter attacks & scoring.** Probe/detector/buff specs loaded from YAML;
   starter catalog ported from augustus's **published** set as data (not hand-authored novel attacks);
   **generative/mutational probes as a first-class type** (#1); **LLM-judge detector + confidence
   scores + multi-detector voting + automatic finding dedup/triage** (#3); brain can synthesize + save
-  a spec from NL.
+  a spec from NL. Adds InferGuard-style layers as data: **encoding-evasion buffs** (Unicode / Morse /
+  emoji / base64 obfuscation) and **output detectors** for secret/API-key leaks, PII and toxicity.
 - **P6 — Brain + semantic memory + resumable multiturn.** `brain` (LLM-as-DNA) backing
   attacker/planner/judge; `memory` embeddings store; attacker/target/judge orchestrator whose each
   turn is steered by semantic recall of prior feedback (#2); memory **persisted per engagement so a
   campaign resumes**, with rate-limit/retry decorators (#10).
 - **P7 — Actionable reporting + CI.** table/json/jsonl/html reports with **severity/CVSS,
-  remediation, OWASP LLM Top 10 + MITRE ATLAS mapping, and a coverage model** (#7); **CI mode** —
-  exit codes, JUnit output, pass/fail thresholds, regression baselines (#6).
+  remediation, OWASP LLM Top 10 + MITRE ATLAS mapping, and a coverage model** (#7); a **guardrail
+  efficacy scorecard** (bypass / detection / over-block rate, driven by a benign false-positive
+  corpus); **CI mode** — exit codes, JUnit output, pass/fail thresholds, regression baselines (#6).
 - **P8 — Governance & budget.** Per-run **token/cost budget + estimate + hard stop** (#5);
   **tamper-evident audit log + target allowlist** on top of the authorization gate (#9); CLI polish.
+- **P9 — Supply-chain / model-artifact scanning.** Scan model files before trusting them
+  (InferGuard-style): malicious **pickle** detection, MIME sniffing, safetensors checks, and
+  **weight-poisoning / backdoor** signals — a static axis distinct from inference-time probing.
+  Activation-tracing / interpretability-based backdoor detection is a research stretch (likely a
+  Python sidecar, since it needs a model runtime).
 
 **TDD discipline:** red (failing test) → green (minimal impl) → refactor, every module.
 Honesty gate: reported results reflect the real `cargo test` output.
@@ -142,8 +153,9 @@ Honesty gate: reported results reflect the real `cargo test` output.
 - [x] P3 Engine — `Probewise` concurrent harness *(tested)*
 - [x] Probe / detector / generator layers (data-driven) *(tested; 49 tests green)*
 - [ ] P2 NL planner (LLM-backed, Ollama first)
-- [ ] P4 Real targets — Ollama, OpenAI-compat, Anthropic, REST, agents/MCP, multimodal
-- [ ] P5 Data catalog + generative probes + LLM-judge + detector confidence/triage
+- [ ] P4 Real targets — LLMs, **guardrails & pipelines**, agents/MCP, multimodal
+- [ ] P5 Data catalog + generative probes + LLM-judge + encoding-evasion buffs + secret/PII/toxicity detectors
 - [ ] P6 Brain + semantic memory + resumable multiturn
-- [ ] P7 Actionable reporting (OWASP/ATLAS, coverage) + CI mode
+- [ ] P7 Actionable reporting (OWASP/ATLAS, coverage) + **guardrail efficacy scorecard** + CI mode
 - [ ] P8 Governance & budget (audit log, allowlist, cost caps)
+- [ ] P9 Supply-chain / model-artifact scanning (pickle, weight-poisoning)

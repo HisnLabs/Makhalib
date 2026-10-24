@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="Makhalib — natural-language LLM red-teaming, in Rust" width="100%">
+  <img src="assets/logo.jpg" alt="Makhalib — falcon claw logo" width="170">
+</p>
+<p align="center">
+  <b>Natural-language LLM &amp; guardrail red-teaming, in Rust.</b><br>
+  <i>Describe the attack. Don't code it.</i>
 </p>
 
 <p align="center">
@@ -12,18 +16,27 @@
 </p>
 
 <p align="center">
-  <b>Works with</b> &nbsp;·&nbsp; Ollama &nbsp;·&nbsp; OpenAI-compatible &nbsp;·&nbsp; Anthropic &nbsp;·&nbsp; any REST endpoint &nbsp;·&nbsp; <i>MCP (coming soon)</i>
+  <b>Targets</b> &nbsp;·&nbsp; LLMs &nbsp;·&nbsp; guardrails &amp; moderation &nbsp;·&nbsp; full pipelines
+</p>
+<p align="center">
+  <b>Works with</b> &nbsp;·&nbsp; Ollama &nbsp;·&nbsp; OpenAI-compatible &nbsp;·&nbsp; Anthropic &nbsp;·&nbsp; any REST endpoint &nbsp;·&nbsp; <i>Guardrino · Llama Guard · moderation APIs · MCP (coming soon)</i>
 </p>
 
 ---
 
 # Makhalib — _describe the attack, don't code it_
 
-**Makhalib** (مخالب, _"claws"_) is a natural-language-driven LLM red-teaming framework. It brings
-together the scanner engine of [augustus](https://github.com/praetorian-inc/augustus) / [garak](https://github.com/NVIDIA/garak)
+**Makhalib** (مخالب, _"claws"_) is a natural-language-driven red-teaming framework for the whole AI
+safety stack — **the model, the guardrails around it, or the full pipeline.** It brings together the
+scanner engine of [augustus](https://github.com/praetorian-inc/augustus) / [garak](https://github.com/NVIDIA/garak)
 and the adaptive multi-turn orchestration of [PyRIT](https://github.com/Azure/PyRIT) — then removes
 the thing that makes all three painful: **you never write code to customize it.** You describe what
 you want in plain language, and an LLM brain compiles it into a reviewable, reproducible scan plan.
+
+Unlike model-only scanners, Makhalib also red-teams **guardrails** — moderation APIs, jailbreak
+classifiers, prompt firewalls and PII filters (like [HisnLabs' own **Guardrino**](https://github.com/HisnLabs/Guardrino)) —
+measuring how often attacks **bypass** them, how much benign traffic they **over-block**, and the
+overhead they add.
 
 > **This repository is the open-source framework.** It ships the engine, the plugin contract, a
 > data-driven probe/detector/target catalog, and the plan compiler. It is **not** a hosted service
@@ -61,8 +74,27 @@ you want in plain language, and an LLM brain compiles it into a reviewable, repr
 | 🧠 | **Semantic memory** | Each turn's feedback is embedded and recalled to drive coherent, escalating multi-turn — and to resume campaigns. |
 | 📄 | **Zero-code customization** | Targets, probes, detectors and strategies are declarative YAML. Share a customization by sharing a file. |
 | 📐 | **Reproducible by design** | The compiled plan is the artifact — deterministic to re-run, diff-able, CI-friendly. |
+| 🛡️ | **Guardrail red-teaming** | Measure **bypass rate**, **over-block (false-positive) rate** and overhead of moderation / classifiers / firewalls — not just the model. |
 | ⚡ | **Single Rust binary** | Concurrent, memory-efficient, no Python env, fast start. |
 | 🔒 | **Safe & accountable** | Mandatory authorization gate, target allowlist, audit log. |
+
+---
+
+## 🛡️ Red-team the whole AI stack
+
+Model-only scanners test one layer. In production, attacks cross a whole stack — and so does Makhalib.
+Point a plan at any layer, or the full pipeline end-to-end:
+
+| Layer | What Makhalib does | Key metrics |
+|---|---|---|
+| 📦 **Model artifact** | Scan weights before you trust them — malicious pickle, MIME sniffing, weight-poisoning / backdoor signals. | malicious-artifact findings |
+| 🚧 **Input guardrail** | Throw adversarial prompts (incl. encoding-evasion: Unicode / Morse / emoji / base64) at moderation, jailbreak classifiers, prompt firewalls. | **bypass rate**, **over-block rate**, latency |
+| 🎯 **Model** | Jailbreaks, prompt injection, data/secret extraction, unsafe tool use. | vulnerable / passed, severity |
+| 🧹 **Output guardrail** | Check leak filters catch secrets / PII / toxicity — and don't mangle benign output. | leak-catch rate, over-redaction |
+| 🔗 **Full pipeline** | End-to-end: did the attack clear the input filter *and* move the model *and* pass the output filter? | end-to-end bypass |
+
+This is what makes guardrail products — including HisnLabs' own [Guardrino](https://github.com/HisnLabs/Guardrino) —
+testable: you get an **efficacy scorecard** (caught vs. bypassed vs. over-blocked), not just a pile of hits.
 
 ---
 
@@ -187,6 +219,15 @@ Rust to extend it:
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) · [`SECURITY.md`](./SECURITY.md) ·
 [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md). Look for issues labeled **`good first issue`** and
 **`help wanted`**. By using or contributing you agree to use Makhalib for **authorized testing only**.
+
+## 🙏 Prior art & inspiration
+
+Makhalib stands on the shoulders of excellent open-source work and brings these ideas under one
+natural-language, no-code roof: [augustus](https://github.com/praetorian-inc/augustus) &
+[garak](https://github.com/NVIDIA/garak) (scanner engine, probes/detectors), [PyRIT](https://github.com/Azure/PyRIT)
+(adaptive multi-turn, attacker/judge, memory), and [InferGuard](https://github.com/InferGuard/InferGuard)
+(output scanning for secrets/PII/toxicity, encoding-evasion, and model-artifact / weight-poisoning
+scanning). Guardrail efficacy testing ties it to [Guardrino](https://github.com/HisnLabs/Guardrino).
 
 ## 💬 Get in touch
 
