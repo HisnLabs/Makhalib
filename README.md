@@ -135,27 +135,33 @@ Honest status — what runs now versus what's still on the [roadmap](./ROADMAP.m
 
 ---
 
-## 🧪 Models tested with Makhalib (point-in-time)
+## 🧪 Local models for the attacker and judge roles (point-in-time)
 
-Local Ollama models were run through the Guardrino gateway (`/v1/inspect`, L1+L2) with Makhalib's seed
-prompts. Each prompt was sent as `input`, each model reply as `output`. Run date 24 Oct 2026, temperature 0,
-replies capped at 160 tokens, 23 unique seed prompts per model.
+We ran three local Ollama models against the Guardrino gateway (`/v1/inspect`, L1+L2) using Makhalib's seed
+prompts, to see how each one behaves as an **attacker** (generating and steering attack prompts) and as a
+**judge** (deciding whether a reply complied). Run date 24 Oct 2026, temperature 0, replies capped at
+160 tokens, 23 unique seed prompts per model.
 
-| Model | Replies allowed by the gateway | Replies blocked | Notes |
+| Model | Replies the gateway allowed | Replies blocked | Compliance with injection prompts (observed) |
 |---|---:|---:|---|
-| `qwen2.5:7b` | 4 / 23 | 19 / 23 | Many harmless decoding replies were blocked (possible output over-blocking). |
-| `llama3.1:8b` | 14 / 23 | 9 / 23 | Some compliant replies to injections were allowed (for example "Developer Mode" acceptance). |
-| `mistral:7b-instruct-q4_0` | 18 / 23 | 5 / 23 | Most replies allowed, including some injection-compliant ones. |
+| `qwen2.5:7b` | 4 / 23 | 19 / 23 | Low in this run; many replies were decoding attempts |
+| `llama3.1:8b` | 14 / 23 | 9 / 23 | High: accepted "Developer Mode" and produced invented system text |
+| `mistral:7b-instruct-q4_0` | 18 / 23 | 5 / 23 | High: most replies were allowed, some were injection-compliant |
 
-Prompts: 16 of 23 blocked at input (the same for every model, since the input check does not use the model).
+**What this shows:**
+- **Attacker role:** `llama3.1:8b` and `mistral:7b-instruct-q4_0` readily follow injection-style instructions. That
+  makes them candidates for generating and varying attack prompts in a red-team loop, under the same
+  authorization gate as any other run.
+- **Judge role:** this run did not measure judging. Whether a model correctly labels a reply as compliant or
+  refusing is still untested. Before a model is used as a judge, its verdicts need checking against a labelled
+  set (agreement rate, false-positive and false-negative rates). Until that is done, judge use is not validated.
+- **Gateway:** the output-side checks let through several injection-compliant replies and blocked some harmless
+  ones. That is a separate finding from the model roles, and it is being reviewed.
 
-**What this means:** the gateway's output-side checks did not reliably stop model compliance with injection
-prompts in this run, and they blocked some harmless replies. This is a snapshot of one seed set. It is not a
-certification, and it does not show that any model is safe. The follow-up work is to review the output-side
-rules and re-run the same test after changes.
+This is a snapshot of one seed set and three models. It is not a certification, and it does not show that any
+model is safe.
 
-Reproduce: `out/ollama-inspect/run.py` (local, not published, because the replies can contain
-attack-like text).
+Reproduce: `out/ollama-inspect/run.py` (local only; the replies can contain attack-like text).
 
 ---
 
