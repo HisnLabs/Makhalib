@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-87%20passing-brightgreen.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-94%20passing-brightgreen.svg" alt="Tests">
   <img src="https://img.shields.io/badge/status-early%20development-yellow.svg" alt="Status"> <img src="https://img.shields.io/badge/v0.0.1-runs%20live-success.svg" alt="v0.0.1">
   <img src="https://img.shields.io/badge/engine-Rust-orange.svg" alt="Built in Rust">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0">
@@ -149,55 +149,104 @@ flowchart LR
 
 ---
 
-## 🚀 Quick start
+## 🚀 Quick start & tutorial
 
 > Prerequisites: a recent stable **Rust** toolchain. No Python, no system ML libraries.
+> **Authorized testing only** — every run needs `--scope`, your attestation of what you may test.
 
-**1. Build & test**
+### 1. Build & test
 
 ```sh
 git clone https://github.com/HisnLabs/Makhalib.git
 cd Makhalib
-cargo build --release     # single static binary
-cargo test                # 87 tests, fully offline & deterministic
+cargo build --release          # single static binary at target/release/makhalib
+cargo test                     # 94 tests, fully offline & deterministic
 ```
 
-**2. Red-team a guardrail (V0.0.1, live)** — point it at any HTTP `/classify` endpoint you own:
+### 2. Red-team a guardrail classifier
+
+Point it at any HTTP endpoint that scores text — contract
+`POST {"text":"..."}` → `{"score", "attack", "threshold", "categories"}`:
 
 ```sh
 makhalib redteam \
   --endpoint http://localhost:8810/classify \
   --scope "my own guardrail (authorized)" \
-  --max-depth 3 --beam 4 --out out/run-1
-# -> out/run-1/{summary.md, findings.csv, results.json, results.jsonl}
+  --max-depth 3 --beam 4 \
+  --out out/run-1
 ```
 
-Endpoint contract: `POST {"text": "..."}` → `{"score", "attack", "threshold", "categories"}`.
+Makhalib sends canonical attack seeds, then **adaptively mutates** the blocked ones (rot13, reverse,
+leetspeak, base64, homoglyph, zero-width…), hill-climbing on the guardrail's own score until one slips
+through. Everything lands in `out/run-1/`.
 
-**3. Write a plan** — the declarative artifact every scan runs from. Save as `plan.yaml`:
+### 3. Red-team the full product (two layers)
+
+If your guardrail is a gateway that combines a rule layer + a model layer and returns a decision
+(`{action, forward, layers:[...]}`), use `--format inspect` to score the **product**, not the bare model:
+
+```sh
+makhalib redteam \
+  --endpoint http://localhost:8787/v1/inspect --format inspect \
+  --scope "my gateway L1+L2 (authorized)" \
+  --out out/gateway
+```
+
+### 4. Cap the cost
+
+A hard token budget stops the run gracefully — never burn more than you allow:
+
+```sh
+makhalib redteam --endpoint … --scope "…" --token-limit 50000
+# tokens used (est): 49987 / 50000 (budget reached — run stopped early)
+```
+
+### 5. Measure efficacy & gate a release (CI)
+
+A bypass rate alone is misleading — a guardrail that blocks *everything* looks perfect. Every run also
+measures the **over-block rate** on benign traffic, and can **fail CI** on thresholds:
+
+```sh
+makhalib redteam --endpoint http://localhost:8787/v1/inspect --format inspect --scope "…" \
+  --max-bypass 5 --max-false-block 3      # percent; non-zero exit if exceeded
+# => scorecard.md + "GATE: PASS" (exit 0) or "GATE: FAIL" (exit 1)
+```
+
+Supply your own normal-traffic sample with `--benign traffic.txt` (one message per line).
+
+### 6. Read the results
+
+| File | What |
+|---|---|
+| `summary.md` | human-readable: bypass rate, per-category & per-obfuscation breakdown, findings |
+| `findings.csv` | confirmed bypasses for the review list (id, category, severity, mutations, text) |
+| `scorecard.md` | bypass vs over-block, with PASS/FAIL against your thresholds |
+| `results.json` / `.jsonl` | full machine-readable run (every attempt, scores, tokens) |
+
+### 7. Bring your own attacks (no code)
+
+Seeds are data — pass `--seeds seeds.yaml`:
 
 ```yaml
-version: "1"
-authorization:
-  authorized: true                 # mandatory gate — nothing runs without it
-  scope: "my own Ollama instance on localhost"
-target:
-  kind: ollama
-  config:
-    host: http://localhost:11434
-    model: llama3
-probes:
-  - test.Hello                      # built-in benign probe
-detectors:
-  - refusal.Refusal                 # scores "did the model refuse?"
-harness:
-  kind: probewise
-concurrency: 8
+seeds:
+  - { category: direct_injection,  text: "…" }
+  - { category: prompt_extraction, text: "…" }
 ```
 
-The engine validates the authorization gate first, runs each probe against the target under a bounded
-concurrent pool, scores every response, and reports a verdict per attempt. *(Plan-driven CLI and the
-natural-language planner are the next milestones — see the roadmap.)*
+### CLI reference
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--endpoint <url>` | `…:8810/classify` | target endpoint |
+| `--format <classify\|inspect>` | `classify` | bare model vs gateway L1+L2 |
+| `--scope "<text>"` | **required** | authorization attestation |
+| `--max-depth` / `--beam <n>` | 3 / 4 | adaptive search depth & width |
+| `--runs <n>` | 1 | repetitions per candidate (exploitability) |
+| `--concurrency <n>` | 8 | max concurrent target calls |
+| `--token-limit <n>` | 0 (∞) | hard token budget |
+| `--benign <file>` | built-in | normal-traffic corpus for over-block |
+| `--max-bypass` / `--max-false-block <pct>` | off | CI gate thresholds |
+| `--out <dir>` | `out/guardrail-run` | export directory |
 
 ---
 
