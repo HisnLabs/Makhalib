@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-94%20passing-brightgreen.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-107%20passing-brightgreen.svg" alt="Tests">
   <img src="https://img.shields.io/badge/status-early%20development-yellow.svg" alt="Status"> <img src="https://img.shields.io/badge/v0.0.1-runs%20live-success.svg" alt="v0.0.1">
   <img src="https://img.shields.io/badge/engine-Rust-orange.svg" alt="Built in Rust">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0">
@@ -104,6 +104,31 @@ testable: you get an **efficacy scorecard** (caught vs. bypassed vs. over-blocke
 
 ---
 
+## ✅ What's shipped today
+
+Honest status — what runs now versus what's still on the [roadmap](./ROADMAP.md).
+
+| Area | Feature | Status |
+|---|---|:--:|
+| **Engine** | Concurrent, bounded-pool scanner; typed plugin registry; async trait contract | ✅ |
+| **Safety** | Mandatory authorization gate (`--scope`), `ScanPlan` validation | ✅ |
+| **Targets** | Mock · Ollama · guardrail `/classify` · gateway `/v1/inspect` (L1+L2) | ✅ |
+| **Attacks** | Adaptive beam/hill-climb search over 10 transform buffs (base64, rot13, leetspeak, homoglyph, zero-width, reverse, case, spaced, payload-split, wrap) | ✅ |
+| **Detectors** | keyword · regex · refusal · secrets (gitleaks-style + CLI) · PII (Luhn-checked) · guardrail-bypass · inspect-bypass | ✅ |
+| **Cost control** | Per-attempt token counts, `--token-limit` hard cap, pre-run estimate | ✅ |
+| **Efficacy** | Bypass rate **and** over-block rate on benign traffic, `scorecard.md`, CI gates (`--max-bypass`, `--max-false-block`) | ✅ |
+| **Reporting** | `summary.md`, `findings.csv`, `results.json`, `results.jsonl`, severity matrix | ✅ |
+| **Defender** | `harden` — projects normalize-then-classify and re-verifies the fix on the live guard | ✅ |
+| **Brain plumbing** | Provider-agnostic `LlmClient`: Ollama · OpenAI · Anthropic · Gemini · OpenAI-compatible, `ask` command | ✅ |
+| **NL planner** | Natural language → reviewable `ScanPlan` | 🟡 in progress |
+| **Targets (more)** | OpenAI/Anthropic as *targets*, generic REST, agents/MCP, multimodal | ⬜ |
+| **Catalog** | Generative probes, LLM-judge, YAML catalog loader, threat-intel feed | ⬜ |
+| **Memory** | Semantic memory, resumable multi-turn, Redis vector store | ⬜ |
+| **Defender (more)** | MCP server + defender agent (find → fix → verify loop in CI) | ⬜ |
+| **Multimodal** | PDF / image-steganography / hidden-text attack surfaces | ⬜ |
+
+---
+
 ## 🛠️ How it works
 
 ```mermaid
@@ -160,7 +185,7 @@ flowchart LR
 git clone https://github.com/HisnLabs/Makhalib.git
 cd Makhalib
 cargo build --release          # single static binary at target/release/makhalib
-cargo test                     # 94 tests, fully offline & deterministic
+cargo test                     # 107 tests, fully offline & deterministic
 ```
 
 ### 2. Red-team a guardrail classifier
@@ -232,6 +257,31 @@ seeds:
   - { category: direct_injection,  text: "…" }
   - { category: prompt_extraction, text: "…" }
 ```
+
+### 8. Verify a fix (`harden`)
+
+After a run, project what **normalize-then-classify** hardening would close — Makhalib re-queries your
+live guard with normalized views of each confirmed bypass and reports how many it would catch:
+
+```sh
+makhalib harden \
+  --endpoint http://localhost:8787/v1/inspect --format inspect \
+  --run out/gateway --scope "my gateway (authorized)"
+# -> out/gateway/harden.md   (caught-by-normalization table + residual)
+```
+
+### 9. Talk to any LLM provider (`ask`)
+
+The brain's provider-agnostic client — smoke-test any backend before wiring it in:
+
+```sh
+makhalib ask --provider ollama    --model qwen2.5:14b   "Say pong"
+makhalib ask --provider anthropic --model <claude-model> "…"    # needs ANTHROPIC_API_KEY
+makhalib ask --provider gemini    --model <gemini-model> "…"    # needs GEMINI_API_KEY
+makhalib ask --provider openai    --model <gpt-model>    "…"    # needs OPENAI_API_KEY
+```
+
+Any OpenAI-compatible server (OpenRouter, vLLM, LM Studio) works with `--provider openai-compatible --base-url …`.
 
 ### CLI reference
 
