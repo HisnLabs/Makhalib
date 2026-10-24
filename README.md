@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/tests-49%20passing-brightgreen.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-57%20passing-brightgreen.svg" alt="Tests">
   <img src="https://img.shields.io/badge/status-early%20development-yellow.svg" alt="Status">
   <img src="https://img.shields.io/badge/engine-Rust-orange.svg" alt="Built in Rust">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0">
@@ -153,7 +153,7 @@ flowchart LR
 git clone https://github.com/HisnLabs/Makhalib.git
 cd Makhalib
 cargo build          # single static binary
-cargo test           # 49 tests, fully offline & deterministic
+cargo test           # 57 tests, fully offline & deterministic
 ```
 
 **2. Write a plan** — the declarative artifact every scan runs from. Save as `plan.yaml`:

@@ -128,6 +128,8 @@ The reasons people adopt these tools and then leave, and where Makhalib stands o
   scores + multi-detector voting + automatic finding dedup/triage** (#3); brain can synthesize + save
   a spec from NL. Adds InferGuard-style layers as data: **encoding-evasion buffs** (Unicode / Morse /
   emoji / base64 obfuscation) and **output detectors** for secret/API-key leaks, PII and toxicity.
+  *(Shipped: `secrets.Secrets` gitleaks-style ruleset, `secrets.Gitleaks` external-CLI detector, and
+  `pii.PII` with Luhn-checked cards.)*
 - **P6 — Brain + semantic memory + resumable multiturn.** `brain` (LLM-as-DNA) backing
   attacker/planner/judge; `memory` embeddings store; attacker/target/judge orchestrator whose each
   turn is steered by semantic recall of prior feedback (#2); memory **persisted per engagement so a
@@ -151,7 +153,7 @@ Honesty gate: reported results reflect the real `cargo test` output.
 - [x] P0 Foundation — domain types, typed registry *(tested)*
 - [x] P1 Plan keystone — `ScanPlan` + authorization gate *(tested)*
 - [x] P3 Engine — `Probewise` concurrent harness *(tested)*
-- [x] Probe / detector / generator layers (data-driven) *(tested; 49 tests green)*
+- [x] Probe / detector / generator layers (data-driven) *(tested; 57 tests green)*
 - [ ] P2 NL planner (LLM-backed, Ollama first)
 - [ ] P4 Real targets — LLMs, **guardrails & pipelines**, agents/MCP, multimodal
 - [ ] P5 Data catalog + generative probes + LLM-judge + encoding-evasion buffs + secret/PII/toxicity detectors
