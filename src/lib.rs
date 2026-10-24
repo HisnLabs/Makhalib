@@ -15,6 +15,7 @@ pub mod core;
 pub mod detectors;
 pub mod generators;
 pub mod guardrail;
+pub mod inspect;
 pub mod plan;
 pub mod probes;
 pub mod registry;

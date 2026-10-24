@@ -56,6 +56,10 @@ enum Cmd {
         /// Token budget (estimated); 0 = unlimited. The run stops when hit.
         #[arg(long = "token-limit", default_value_t = 0)]
         token_limit: u64,
+        /// Response format: "classify" (bare model /classify) or "inspect"
+        /// (gateway /v1/inspect, combined L1+L2 product decision).
+        #[arg(long, default_value = "classify")]
+        format: String,
         /// Optional seeds YAML ({seeds: [{category, text}]}); defaults are built in.
         #[arg(long)]
         seeds: Option<PathBuf>,
@@ -137,7 +141,7 @@ fn now_stamp() -> String {
 async fn main() -> makhalib::Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Redteam { endpoint, out, scope, runs, max_depth, beam, concurrency, token_limit, seeds } => {
+        Cmd::Redteam { endpoint, out, scope, runs, max_depth, beam, concurrency, token_limit, format, seeds } => {
             let scope = match scope {
                 Some(s) if !s.trim().is_empty() => s,
                 _ => {
@@ -177,7 +181,16 @@ async fn main() -> makhalib::Result<()> {
             let base: Arc<dyn Generator> = Arc::new(GuardrailGenerator::new("guardrail.Guardrail", &endpoint));
             let gen: Arc<dyn Generator> = Arc::new(MeteredGenerator::new(base, meter.clone()));
             let probes: Vec<Arc<dyn Probe>> = vec![Arc::new(SeedsProbe { seeds: seed_list })];
-            let detectors: Vec<Arc<dyn Detector>> = vec![Arc::new(GuardrailBypassDetector::default())];
+            let detectors: Vec<Arc<dyn Detector>> = match format.as_str() {
+                "inspect" => {
+                    println!("format: inspect (gateway /v1/inspect — combined L1+L2)");
+                    vec![Arc::new(makhalib::inspect::InspectBypassDetector) as Arc<dyn Detector>]
+                }
+                _ => {
+                    println!("format: classify (bare model /classify — L2 only)");
+                    vec![Arc::new(GuardrailBypassDetector::default()) as Arc<dyn Detector>]
+                }
+            };
             let buff_set: Vec<Arc<dyn Buff>> = buffs::all_buffs();
             let cfg = AdaptiveConfig { runs, max_depth, beam, concurrency, keep_all: false };
             let harness = AdaptiveHarness::with_meter(buff_set, cfg, meter.clone());
