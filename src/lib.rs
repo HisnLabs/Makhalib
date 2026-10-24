@@ -8,12 +8,16 @@
 //! **For authorized LLM security testing only.** Every [`plan::ScanPlan`] carries an
 //! explicit authorization gate that must be satisfied before execution.
 
+pub mod adaptive;
+pub mod buffs;
 pub mod core;
 pub mod detectors;
 pub mod generators;
+pub mod guardrail;
 pub mod plan;
 pub mod probes;
 pub mod registry;
+pub mod report;
 pub mod scanner;
 pub mod traits;
 
