@@ -1,2 +1,4 @@
 reference/
 target/
+out/
+plans/*.local.yaml
