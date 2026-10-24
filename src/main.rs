@@ -150,6 +150,20 @@ enum Cmd {
         #[arg(long, default_value = "out/carriers")]
         out: PathBuf,
     },
+    /// Replay an operator-supplied multi-turn conversation script against a guardrail endpoint.
+    Replay {
+        #[arg(long)]
+        script: PathBuf,
+        #[arg(long, default_value = "http://localhost:8787/v1/inspect")]
+        endpoint: String,
+        #[arg(long, default_value = "inspect")]
+        format: String,
+        /// Scope attestation, required.
+        #[arg(long)]
+        scope: Option<String>,
+        #[arg(long = "allow-host")]
+        allow_host: Vec<String>,
+    },
     /// Serve the read-only results dashboard for exported runs.
     Ui {
         #[arg(long, default_value_t = 8088)]
@@ -703,6 +717,32 @@ async fn main() -> makhalib::Result<()> {
                 println!("wrote {} (canary readable by naive extractor: {})", path.display(),
                     makhalib::carrier::canary_recoverable(&c.bytes, &canary));
             }
+            Ok(())
+        }
+        Cmd::Replay { script, endpoint, format, scope, allow_host } => {
+            let scope = match scope {
+                Some(s) if !s.trim().is_empty() => s,
+                _ => {
+                    eprintln!("refusing: pass --scope \"<authorized scope>\"");
+                    std::process::exit(2);
+                }
+            };
+            if let Err(e) = makhalib::governance::check_allowlist(&endpoint, &allow_host) {
+                eprintln!("refusing: {e} (pass --allow-host <host>)");
+                std::process::exit(2);
+            }
+            let sc = makhalib::multiturn::parse_script(&std::fs::read_to_string(&script)?)?;
+            let gen = GuardrailGenerator::new("guardrail.Guardrail", &endpoint);
+            let det: Arc<dyn Detector> = match format.as_str() {
+                "inspect" => Arc::new(makhalib::inspect::InspectBypassDetector),
+                _ => Arc::new(GuardrailBypassDetector::default()),
+            };
+            let r = makhalib::multiturn::replay(&gen, &det, &sc).await?;
+            println!("conversation '{}' · scope: {scope}", r.name);
+            for t in &r.turns {
+                println!("  turn {} score={:.3} {}", t.turn, t.score, if t.bypass { "BYPASS" } else { "blocked" });
+            }
+            println!("conversation bypass: {}", r.bypass);
             Ok(())
         }
         Cmd::Ui { port, reports, dist } => {

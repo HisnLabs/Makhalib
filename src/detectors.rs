@@ -380,6 +380,7 @@ pub fn builtin_registry() -> Registry<Arc<dyn Detector>> {
         Ok(Arc::new(d) as Arc<dyn Detector>)
     });
     crate::detect_base::register(&reg);
+    crate::detect_patterns::register(&reg);
     reg.register("secrets.Secrets", |cfg| {
         let mut rules = SecretsDetector::default_rules();
         if let Some(arr) = cfg.get("rules").and_then(|v| v.as_array()) {

@@ -105,3 +105,20 @@ crosswalk in reporting (P7).
 4. **StrongREJECT LLM-judge detector** (F) — kills false positives.
 5. **Llama Guard / Presidio / Detoxify** reusable detectors (D).
 6. **ModelScan / picklescan** artifact scanning (E, P9).
+
+---
+
+## Augustus ports (Apache-2.0, praetorian-inc/augustus)
+
+Scoring logic only. Payload text is never copied into this repository; probe prompts are read from
+an operator-supplied augustus checkout at run time.
+
+| Augustus component | Makhalib module | Status |
+|---|---|---|
+| `base.StringDetector` (str / word / startswith) | `detect_base` | ✅ ported, tested |
+| `patterns.Patterns` (any / all / weighted) | `detect_patterns` | ✅ ported, tested |
+| YAML probe templates | `catalog`, `catalog-convert` | ✅ loader and conversion |
+| Multi-turn strategies (Crescendo, GOAT, Hydra) | `multiturn` (replay only) | ⬜ escalation logic not built by design |
+| Go-coded probes | — | ⬜ not ported (payloads stay in the augustus checkout) |
+| `toxiccomment`, `unsafecontent`, `shields`, `judge` | — | ⬜ next candidates for detector ports |
+

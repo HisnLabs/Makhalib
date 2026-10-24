@@ -200,7 +200,7 @@ Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to 
 - [x] P2 NL planner — NL → ScanPlan via any LLM provider, validated; rejects unknown targets, probes, detectors and buffs; `makhalib plan` ✅
 - [~] P4 Targets — ✅ mock, Ollama, guardrail `/classify`, gateway `/v1/inspect` (L1+L2); ⬜ OpenAI/Anthropic as targets, generic REST, agents/MCP, multimodal
 - [~] P5 Catalog — ✅ augustus catalog converted to Makhalib probe specs (local output, `catalog-convert`), loader, LLM judge, toxicity detector, finding dedup and triage; ⛔ generative attack-prompt generation deliberately not built (the mutation buffs and catalog cover the attack side)
-- [ ] P6 Brain + semantic memory + resumable multiturn
+- [~] P6 Brain + semantic memory + multiturn — ✅ multi-turn replay of operator-supplied scripts with per-turn scoring (`replay`); ⬜ semantic memory, resumable campaigns, attacker/judge orchestration (attack-message generation not built by design)
 - [~] P7 Reporting — ✅ jsonl/json/md/csv export, severity matrix, **efficacy scorecard (bypass + over-block)**, CI gates; ⬜ OWASP/ATLAS mapping, coverage model, with/without differential
 - [~] P8 Governance — ✅ authorization gate, token/cost caps, **target allowlist** (refuses unlisted hosts before any request), **tamper-evident SHA-256 audit log with per-run token accounting**; ⬜ actor identity from SSO, log export/SIEM
 - [~] P9 Supply-chain / model-artifact scanning — ✅ static scanner (pickle opcodes, deny-listed modules, safetensors header/bounds, zip flagged) via `makhalib scan-artifact`; ⬜ zip/pickle inner unpacking, weight-poisoning checks
