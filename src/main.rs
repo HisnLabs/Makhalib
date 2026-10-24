@@ -56,6 +56,12 @@ enum Cmd {
         /// Token budget (estimated); 0 = unlimited. The run stops when hit.
         #[arg(long = "token-limit", default_value_t = 0)]
         token_limit: u64,
+        /// Hosts this run may target (repeatable). Required: an empty list refuses.
+        #[arg(long = "allow-host")]
+        allow_host: Vec<String>,
+        /// Append a tamper-evident audit record to this JSONL file.
+        #[arg(long)]
+        audit: Option<PathBuf>,
         /// Response format: "classify" (bare model /classify) or "inspect"
         /// (gateway /v1/inspect, combined L1+L2 product decision).
         #[arg(long, default_value = "classify")]
@@ -189,6 +195,8 @@ async fn main() -> makhalib::Result<()> {
             beam,
             concurrency,
             token_limit,
+            allow_host,
+            audit,
             format,
             benign,
             max_bypass,
@@ -205,6 +213,11 @@ async fn main() -> makhalib::Result<()> {
                     std::process::exit(2);
                 }
             };
+
+            if let Err(e) = makhalib::governance::check_allowlist(&endpoint, &allow_host) {
+                eprintln!("refusing: {e} (pass --allow-host <host>)");
+                std::process::exit(2);
+            }
 
             let seed_list = match seeds {
                 Some(p) => {
@@ -310,6 +323,39 @@ async fn main() -> makhalib::Result<()> {
                 scorecard.benign_total
             );
             println!("  wrote {}", sc_path.display());
+
+            if let Some(audit_path) = &audit {
+                let prev_text = std::fs::read_to_string(audit_path).unwrap_or_default();
+                let prev: Option<makhalib::governance::AuditEntry> =
+                    prev_text.lines().filter(|l| !l.trim().is_empty()).last()
+                        .and_then(|l| serde_json::from_str(l).ok());
+                let outcome = format!(
+                    "bypass={:.1}% over_block={:.1}% attempts={}",
+                    scorecard.bypass_rate() * 100.0,
+                    scorecard.over_block_rate() * 100.0,
+                    total
+                );
+                let entry = makhalib::governance::next_entry(
+                    prev.as_ref(),
+                    &now_stamp(),
+                    &std::env::var("USER").unwrap_or_else(|_| "unknown".into()),
+                    &scope,
+                    &endpoint,
+                    &outcome,
+                    meter.used(),
+                    meter.limit(),
+                );
+                use std::io::Write;
+                let mut f = std::fs::OpenOptions::new().create(true).append(true).open(audit_path)?;
+                writeln!(f, "{}", serde_json::to_string(&entry)?)?;
+                println!(
+                    "  audit seq {} · tokens {}/{} -> {}",
+                    entry.seq,
+                    entry.tokens_used,
+                    if entry.token_limit == 0 { "unlimited".to_string() } else { entry.token_limit.to_string() },
+                    audit_path.display()
+                );
+            }
 
             if (max_b.is_some() || max_fb.is_some()) && !scorecard.passes(max_b, max_fb) {
                 eprintln!("GATE: FAIL (thresholds exceeded)");

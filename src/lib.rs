@@ -15,6 +15,7 @@ pub mod core;
 pub mod detectors;
 pub mod efficacy;
 pub mod generators;
+pub mod governance;
 pub mod guardrail;
 pub mod harden;
 pub mod inspect;
