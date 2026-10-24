@@ -13,6 +13,7 @@ pub mod budget;
 pub mod buffs;
 pub mod core;
 pub mod detectors;
+pub mod efficacy;
 pub mod generators;
 pub mod guardrail;
 pub mod inspect;

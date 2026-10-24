@@ -60,6 +60,16 @@ enum Cmd {
         /// (gateway /v1/inspect, combined L1+L2 product decision).
         #[arg(long, default_value = "classify")]
         format: String,
+        /// Benign corpus file (one normal message per line) for over-block
+        /// measurement; built-in samples are used when omitted.
+        #[arg(long)]
+        benign: Option<PathBuf>,
+        /// CI gate: max acceptable bypass rate, in percent (-1 = off).
+        #[arg(long = "max-bypass", default_value_t = -1.0)]
+        max_bypass: f64,
+        /// CI gate: max acceptable over-block rate, in percent (-1 = off).
+        #[arg(long = "max-false-block", default_value_t = -1.0)]
+        max_false_block: f64,
         /// Optional seeds YAML ({seeds: [{category, text}]}); defaults are built in.
         #[arg(long)]
         seeds: Option<PathBuf>,
@@ -141,7 +151,21 @@ fn now_stamp() -> String {
 async fn main() -> makhalib::Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Redteam { endpoint, out, scope, runs, max_depth, beam, concurrency, token_limit, format, seeds } => {
+        Cmd::Redteam {
+            endpoint,
+            out,
+            scope,
+            runs,
+            max_depth,
+            beam,
+            concurrency,
+            token_limit,
+            format,
+            benign,
+            max_bypass,
+            max_false_block,
+            seeds,
+        } => {
             let scope = match scope {
                 Some(s) if !s.trim().is_empty() => s,
                 _ => {
@@ -195,7 +219,7 @@ async fn main() -> makhalib::Result<()> {
             let cfg = AdaptiveConfig { runs, max_depth, beam, concurrency, keep_all: false };
             let harness = AdaptiveHarness::with_meter(buff_set, cfg, meter.clone());
 
-            let attempts = harness.run(gen, &probes, &detectors).await?;
+            let attempts = harness.run(gen.clone(), &probes, &detectors).await?;
 
             let meta = RunMeta {
                 target: "guardrail".into(),
@@ -224,6 +248,46 @@ async fn main() -> makhalib::Result<()> {
             println!("tokens used (est): {}{}", meter.used(), budget_note);
             for p in paths {
                 println!("  wrote {}", p.display());
+            }
+
+            // --- Efficacy scorecard: measure over-block on benign traffic -----
+            let benign_list: Vec<String> = match benign {
+                Some(p) => std::fs::read_to_string(&p)?
+                    .lines()
+                    .map(|l| l.trim())
+                    .filter(|l| !l.is_empty())
+                    .map(|l| l.to_string())
+                    .collect(),
+                None => makhalib::efficacy::benign_corpus(),
+            };
+            let ob = makhalib::efficacy::measure_over_block(gen.clone(), &detectors[0], &benign_list).await?;
+            let scorecard = makhalib::efficacy::Scorecard {
+                attack_total: total,
+                attack_bypassed: bypassed,
+                benign_total: ob.total,
+                over_blocked: ob.blocked,
+            };
+            let max_b = if max_bypass < 0.0 { None } else { Some(max_bypass / 100.0) };
+            let max_fb = if max_false_block < 0.0 { None } else { Some(max_false_block / 100.0) };
+            let md = scorecard.to_markdown(max_b, max_fb);
+            let sc_path = out.join("scorecard.md");
+            std::fs::write(&sc_path, &md)?;
+            println!("\n=== efficacy scorecard ===");
+            println!(
+                "bypass rate: {:.1}% · over-block rate: {:.1}% ({} benign blocked / {})",
+                scorecard.bypass_rate() * 100.0,
+                scorecard.over_block_rate() * 100.0,
+                scorecard.over_blocked,
+                scorecard.benign_total
+            );
+            println!("  wrote {}", sc_path.display());
+
+            if (max_b.is_some() || max_fb.is_some()) && !scorecard.passes(max_b, max_fb) {
+                eprintln!("GATE: FAIL (thresholds exceeded)");
+                std::process::exit(1);
+            }
+            if max_b.is_some() || max_fb.is_some() {
+                println!("GATE: PASS");
             }
             Ok(())
         }
