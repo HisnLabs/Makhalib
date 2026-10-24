@@ -169,12 +169,14 @@ Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to 
   tokens/attempt, bypasses per 1k tokens, and throughput**; regression-tracked. Engineering rule:
   pick the **fastest Rust libs** (e.g. `rapidhash`/`ahash`, `simd-json`, `smallvec`, `bytes`) and
   **compress payloads** (short encodings, dedupe, template reuse) so each attack costs fewer tokens.
-- **P12 — Document & multimodal attacks.** **PDF-borne injection**, **image steganography** (hidden
-  text/LSB in images for vision targets), and **hidden-in-plain-sight** carriers (zero-width,
-  homoglyph, whitespace, file metadata, HTML comments) as first-class probes/buffs. *(COV-02, COV-12)*
-- **P13 — Threat-intel feed.** Ingest the **latest arXiv LLM-attack papers** and public
-  **jailbreak/zero-day disclosures** into the probe catalog on a schedule, so customers are tested
-  against fresh techniques — a living attack database, curated as data.
+- **P12 — Document & multimodal + char-injection attacks.** New buffs **`emoji_smuggle`, `bidi`,
+  `unicode_tags`** (char-injection that near-completely evades classifiers — confirmed against
+  Guardrino); **PDF-borne injection**, **image steganography** (LSB/typographic/adversarial-pixel),
+  and **hidden-in-plain-sight** carriers (whitespace, file metadata, HTML comments). *(COV-02, COV-12)*
+- **P13 — Threat-intel feed.** Ingest the **latest arXiv LLM-attack papers** + public
+  **jailbreak/zero-day disclosures + CVE feeds** into the catalog on a schedule — a living attack
+  database, curated as data. Seeded by [`docs/THREAT-INTEL.md`](docs/THREAT-INTEL.md) (char-injection,
+  prompt-weaving/CKA, TopicAttack, H-CoT, Odysseus stego, MCP tool-poisoning, EchoLeak CVE-2025-32711).
 - **P14 — Malware & artifact signature DB.** A **YARA/signature database** for model-artifact and
   skill scanning (malicious pickle, backdoor triggers, typosquats), updatable. *(extends P9, COV-09/18)*
 - **P15 — Redis vector memory.** A **Redis + vector** backend for the semantic memory (P6):
