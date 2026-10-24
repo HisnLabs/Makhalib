@@ -196,13 +196,13 @@ Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to 
 - [x] P0 Foundation — domain types, typed registry *(tested)*
 - [x] P1 Plan keystone — `ScanPlan` + authorization gate *(tested)*
 - [x] P3 Engine — `Probewise` concurrent harness *(tested)*
-- [x] Probe / detector / generator layers (data-driven) *(tested; 57 tests green)*
+- [x] Probe / detector / generator layers (data-driven) *(tested; 107 tests green)*
 - [~] P2 NL planner — **provider-agnostic LLM client shipped** (Ollama/OpenAI/Anthropic/Gemini/OpenAI-compatible, `ask` verified live) ✅; NL → `ScanPlan` planner next
-- [ ] P4 Real targets — LLMs, **guardrails & pipelines**, agents/MCP, multimodal
-- [ ] P5 Data catalog + generative probes + LLM-judge + encoding-evasion buffs + secret/PII/toxicity detectors
+- [~] P4 Targets — ✅ mock, Ollama, guardrail `/classify`, gateway `/v1/inspect` (L1+L2); ⬜ OpenAI/Anthropic as targets, generic REST, agents/MCP, multimodal
+- [~] P5 Catalog — ✅ 10 evasion buffs, secret/PII detectors; ⬜ generative probes, LLM-judge, toxicity, dedup/triage, YAML catalog loader
 - [ ] P6 Brain + semantic memory + resumable multiturn
-- [ ] P7 Actionable reporting (OWASP/ATLAS, coverage) + **guardrail efficacy scorecard** + CI mode
-- [ ] P8 Governance & budget (audit log, allowlist, cost caps)
+- [~] P7 Reporting — ✅ jsonl/json/md/csv export, severity matrix, **efficacy scorecard (bypass + over-block)**, CI gates; ⬜ OWASP/ATLAS mapping, coverage model, with/without differential
+- [~] P8 Governance — ✅ authorization gate, token/cost caps; ⬜ tamper-evident audit log, target allowlist
 - [ ] P9 Supply-chain / model-artifact scanning (pickle, weight-poisoning)
 - [x] **V0.0.1 — COV-13 adaptive guardrail-bypass vs Guardrino** (buffs + target + adaptive harness + export + CLI; run live) ✅
 - [x] **P10 Token metering & budget** — per-attempt token count, `--token-limit` hard cap + pre-run estimate, metered generator ✅
