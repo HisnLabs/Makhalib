@@ -1,0 +1,43 @@
+name: 🐛 Bug report
+description: Something isn't working as expected
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for filing a bug! Please give us enough to reproduce it.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Include the command and, if relevant, the ScanPlan YAML (redact secrets/targets).
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: "e.g. commit 81b9b27 or v0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform & Rust version
+      placeholder: "e.g. macOS 15 arm64, rustc 1.97"
+    validations:
+      required: true
+  - type: checkboxes
+    id: authorized
+    attributes:
+      label: Authorized use
+      options:
+        - label: This report does not contain details of unauthorized testing against third-party systems.
+          required: true

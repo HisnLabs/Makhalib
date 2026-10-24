@@ -1,0 +1,33 @@
+name: 💡 Feature request
+description: Suggest a capability or improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The user need or red-teaming gap behind the request.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should Makhalib do? If it maps to a roadmap phase, link it.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - NL planner / brain
+        - Targets (generators)
+        - Probes / attacks
+        - Detectors / scoring
+        - Semantic memory / multi-turn
+        - Reporting
+        - CI / governance / budget
+        - Other
+    validations:
+      required: true

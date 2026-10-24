@@ -1,0 +1,54 @@
+name: 📄 Contribute an attack / detector / target (no code)
+description: Propose a new probe, detector, or target as a declarative YAML spec — no Rust needed
+labels: ["catalog", "good first issue"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Makhalib's catalog is **data, not code**. Describe your spec here and we'll help land it.
+        Keep examples benign and educational — reference a public technique rather than shipping a
+        novel working exploit. See `CONTRIBUTING.md` and `SECURITY.md`.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Spec kind
+      options:
+        - Probe (attack)
+        - Detector (scoring)
+        - Target (generator)
+        - Buff (transform)
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Fully-qualified name
+      placeholder: "e.g. injection.indirect or keyword.Secrets"
+    validations:
+      required: true
+  - type: textarea
+    id: spec
+    attributes:
+      label: Draft YAML spec
+      render: yaml
+      placeholder: |
+        name: category.Name
+        description: What it checks.
+        goal: The security objective.
+        prompts:
+          - "..."
+        detector: refusal.Refusal
+    validations:
+      required: true
+  - type: input
+    id: reference
+    attributes:
+      label: Public reference (technique / paper / OWASP-ATLAS id)
+      placeholder: "e.g. OWASP LLM01, MITRE ATLAS AML.T0051"
+  - type: checkboxes
+    id: authorized
+    attributes:
+      label: Responsible-use confirmation
+      options:
+        - label: This is for authorized/defensive testing and is not a novel exploit optimized to defeat a specific production system.
+          required: true

@@ -50,6 +50,27 @@ write and ship code.**
 
 ---
 
+## The churn-drivers — full scorecard
+
+The reasons people adopt these tools and then leave, and where Makhalib stands on each.
+✅ = addressed by the design · ➕ = explicit roadmap item below.
+
+| # | Why people leave | Makhalib |
+|---|---|---|
+| 1 | **Static, stale attack corpora.** Fixed DAN/jailbreak lists get patched within weeks; the tool stops finding anything and users wrongly conclude "my model is safe." | ✅/➕ **LLM-as-DNA** generates/mutates attacks adaptively; we make **generative/mutational probes a first-class probe type** (P5). |
+| 2 | **Weak adaptivity / no memory across turns.** Single-shot or scripted multi-turn that can't carry context or escalate. | ✅ **Semantic memory + consequent multi-turn** (P6). |
+| 3 | **False positives/negatives from crude detectors.** String-match scoring floods operators with noise. | ➕ **Confidence scores + multi-detector voting + LLM-judge rubric + automatic dedup/triage** (P5). |
+| 4 | **Can't test real systems** — RAG apps, tool-using agents, MCP servers, authenticated endpoints, multimodal. | ➕ **Data-driven REST/agent/MCP/multimodal target specs**, zero code (P4). |
+| 5 | **Cost / token blowups.** Runs silently rack up spend; a surprise bill kills adoption. | ➕ **Per-run token/cost budget + pre-run estimate + hard stop** in the plan (P8). |
+| 6 | **Reproducibility & CI.** Notebook-driven, nondeterministic, can't gate a pipeline. | ✅/➕ **Plan-as-artifact** (reproducible) + **CI mode**: exit codes, JUnit output, pass/fail thresholds, regression baselines (P7). |
+| 7 | **Reporting isn't actionable.** Raw hit dumps, no severity, no remediation, no framework mapping. | ➕ **Severity/CVSS + remediation + OWASP LLM Top 10 & MITRE ATLAS mapping + coverage model** (P7). |
+| 8 | **Install / ops friction.** Python env hell, heavy ML deps, slow start. | ✅ **Single static Rust binary.** |
+| 9 | **Governance / safety.** No scope enforcement, no audit trail — risky for orgs to authorize. | ✅/➕ **Authorization gate** (done) + **tamper-evident audit log + target allowlist** (P8). |
+| 10 | **No resumability.** Long runs die partway; primitive rate-limit handling. | ➕ **Persisted memory per engagement = resumable campaigns** + rate-limit/retry decorators (P6). |
+| 11 | **Sharing customizations = sharing code.** A new probe is a code PR. | ✅ **Shareable YAML spec** anyone can drop in. |
+
+---
+
 ## Architecture (mirrors augustus, idiomatic async Rust)
 
 | Layer | augustus analog | Makhalib module | Customize by |
@@ -94,26 +115,35 @@ write and ship code.**
 - **P3 — Engine (concurrent, memory-efficient).** `traits`, mock generator, deterministic detector,
   probewise harness, `scanner` with a bounded worker pool + streaming results → end-to-end scan on
   the mock target, offline-tested. *(fanned out to Sonnet agents against the P0/P1 contract)*
-- **P4 — Real targets.** Ollama first, then OpenAI-compat, Anthropic, generic REST (data-configured).
-  HTTP mocked in tests.
-- **P5 — Data catalog.** Probe/detector/buff specs loaded from YAML; starter catalog ported from
-  augustus's **published** set as data (not hand-authored novel attacks); LLM-judge detector;
-  brain can synthesize + save a new spec from NL.
-- **P6 — Brain + semantic memory + multiturn (PyRIT-style).** `brain` (LLM-as-DNA) backing
+- **P4 — Real targets (zero code).** Ollama first, then OpenAI-compat, Anthropic, generic REST,
+  **tool-using agents, MCP servers, authenticated endpoints, multimodal** — all data-configured.
+  HTTP mocked in tests. *(churn-driver #4)*
+- **P5 — Data catalog + smarter attacks & scoring.** Probe/detector/buff specs loaded from YAML;
+  starter catalog ported from augustus's **published** set as data (not hand-authored novel attacks);
+  **generative/mutational probes as a first-class type** (#1); **LLM-judge detector + confidence
+  scores + multi-detector voting + automatic finding dedup/triage** (#3); brain can synthesize + save
+  a spec from NL.
+- **P6 — Brain + semantic memory + resumable multiturn.** `brain` (LLM-as-DNA) backing
   attacker/planner/judge; `memory` embeddings store; attacker/target/judge orchestrator whose each
-  turn is steered by semantic recall of prior feedback (consequent, adaptive escalation); memory
-  persisted per engagement so a campaign resumes.
-- **P7 — Report + polish.** table/json/jsonl/html reports, CLI UX, authorization allowlist, docs.
+  turn is steered by semantic recall of prior feedback (#2); memory **persisted per engagement so a
+  campaign resumes**, with rate-limit/retry decorators (#10).
+- **P7 — Actionable reporting + CI.** table/json/jsonl/html reports with **severity/CVSS,
+  remediation, OWASP LLM Top 10 + MITRE ATLAS mapping, and a coverage model** (#7); **CI mode** —
+  exit codes, JUnit output, pass/fail thresholds, regression baselines (#6).
+- **P8 — Governance & budget.** Per-run **token/cost budget + estimate + hard stop** (#5);
+  **tamper-evident audit log + target allowlist** on top of the authorization gate (#9); CLI polish.
 
 **TDD discipline:** red (failing test) → green (minimal impl) → refactor, every module.
 Honesty gate: reported results reflect the real `cargo test` output.
 
 ## Status
-- [ ] P0 Foundation
-- [ ] P1 Plan keystone
-- [ ] P2 NL planner
-- [ ] P3 Engine
-- [ ] P4 Real targets
-- [ ] P5 Data catalog
-- [ ] P6 Multiturn
-- [ ] P7 Report + polish
+- [x] P0 Foundation — domain types, typed registry *(tested)*
+- [x] P1 Plan keystone — `ScanPlan` + authorization gate *(tested)*
+- [x] P3 Engine — `Probewise` concurrent harness *(tested)*
+- [x] Probe / detector / generator layers (data-driven) *(tested; 49 tests green)*
+- [ ] P2 NL planner (LLM-backed, Ollama first)
+- [ ] P4 Real targets — Ollama, OpenAI-compat, Anthropic, REST, agents/MCP, multimodal
+- [ ] P5 Data catalog + generative probes + LLM-judge + detector confidence/triage
+- [ ] P6 Brain + semantic memory + resumable multiturn
+- [ ] P7 Actionable reporting (OWASP/ATLAS, coverage) + CI mode
+- [ ] P8 Governance & budget (audit log, allowlist, cost caps)

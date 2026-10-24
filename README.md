@@ -7,6 +7,7 @@
   <img src="https://img.shields.io/badge/status-early%20development-yellow.svg" alt="Status">
   <img src="https://img.shields.io/badge/engine-Rust-orange.svg" alt="Built in Rust">
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache 2.0">
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome">
   <a href="https://github.com/HisnLabs/Makhalib"><img src="https://img.shields.io/github/stars/HisnLabs/Makhalib?style=social" alt="Stars"></a>
 </p>
 
@@ -103,6 +104,9 @@ flowchart LR
 | **Surprise API bills.** | Per-run token/cost **budget with a hard stop**. |
 | **Not reproducible / CI-hostile.** | **The plan is the artifact** — deterministic, with a CI mode and regression baselines. |
 | **Reports aren't actionable.** | Severity, remediation, OWASP LLM Top 10 + MITRE ATLAS mapping, coverage. |
+| **Long runs die with no resume.** | **Persisted memory per engagement** = resumable campaigns, with rate-limit/retry. |
+| **No guardrails / audit trail.** | Mandatory **authorization gate**, target allowlist, tamper-evident audit log. |
+| **Sharing a tweak means sharing code.** | Share a **YAML file** — the whole catalog is data. |
 | **Python env hell, slow start.** | **Single static Rust binary.** |
 
 ---
@@ -167,6 +171,22 @@ natural-language planner are the next milestones — see the roadmap.)*
 </div>
 
 ---
+
+## 🤝 Contributing
+
+**Makhalib is open for contribution** — and because the catalog is *data, not code*, you don't need
+Rust to extend it:
+
+- 📄 **Add an attack, detector, or target** as a declarative **YAML spec** — no Rust required. Start
+  from the [New spec issue form](https://github.com/HisnLabs/Makhalib/issues/new/choose).
+- 🦀 **Work on the engine** — the NL planner, real targets (REST/agent/MCP), generative probes, the
+  LLM-judge detector, semantic memory, reporting. Test-first; we keep the suite green and
+  warning-free.
+- 📚 **Docs, examples, triage.**
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) · [`SECURITY.md`](./SECURITY.md) ·
+[`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md). Look for issues labeled **`good first issue`** and
+**`help wanted`**. By using or contributing you agree to use Makhalib for **authorized testing only**.
 
 ## 💬 Get in touch
 
