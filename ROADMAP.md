@@ -197,7 +197,7 @@ Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to 
 - [x] P1 Plan keystone — `ScanPlan` + authorization gate *(tested)*
 - [x] P3 Engine — `Probewise` concurrent harness *(tested)*
 - [x] Probe / detector / generator layers (data-driven) *(tested; 57 tests green)*
-- [ ] P2 NL planner — provider-agnostic brain (Ollama/OpenAI/Anthropic/Gemini/OpenAI-compatible)
+- [~] P2 NL planner — **provider-agnostic LLM client shipped** (Ollama/OpenAI/Anthropic/Gemini/OpenAI-compatible, `ask` verified live) ✅; NL → `ScanPlan` planner next
 - [ ] P4 Real targets — LLMs, **guardrails & pipelines**, agents/MCP, multimodal
 - [ ] P5 Data catalog + generative probes + LLM-judge + encoding-evasion buffs + secret/PII/toxicity detectors
 - [ ] P6 Brain + semantic memory + resumable multiturn
