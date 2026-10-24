@@ -417,19 +417,15 @@ async fn main() -> makhalib::Result<()> {
                 }
             };
             let jsonl = std::fs::read_to_string(run.join("results.jsonl"))?;
-            let mut bypasses: Vec<(String, String)> = Vec::new();
+            let mut findings: Vec<makhalib::core::Attempt> = Vec::new();
             for line in jsonl.lines() {
-                if line.trim().is_empty() {
-                    continue;
-                }
                 if let Ok(a) = serde_json::from_str::<makhalib::core::Attempt>(line) {
                     if a.metadata.get("bypass").and_then(|v| v.as_bool()).unwrap_or(false) {
-                        let cat = a.metadata.get("category").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                        bypasses.push((cat, a.prompt));
+                        findings.push(a);
                     }
                 }
             }
-            println!("harden · {endpoint} · {format} · {} confirmed bypasses · authorized: {scope}", bypasses.len());
+            println!("harden · {endpoint} · {format} · {} confirmed bypasses · authorized: {scope}", findings.len());
 
             let gen: Arc<dyn Generator> = Arc::new(GuardrailGenerator::new("guardrail.Guardrail", &endpoint));
             let detector: Arc<dyn Detector> = match format.as_str() {
@@ -438,60 +434,135 @@ async fn main() -> makhalib::Result<()> {
             };
 
             use std::collections::BTreeMap;
-            let mut caught = 0usize;
-            let mut by_method: BTreeMap<String, usize> = BTreeMap::new();
-            let mut residual: Vec<(String, String)> = Vec::new();
-            for (cat, text) in &bypasses {
-                let mut hit: Option<String> = None;
-                for (method, view) in makhalib::harden::normalized_views(text) {
-                    let mut a = makhalib::core::Attempt::new(view.clone());
-                    if let Ok(msgs) = gen.generate(&makhalib::core::Conversation::from_prompt(view), 1).await {
-                        a.outputs.clear();
+            // Per finding: (id, category, severity, mutations, tokens, caught_by, control, prompt)
+            let mut rows: Vec<(String, String, String, Vec<String>, u64, Option<String>, &'static str, String)> = Vec::new();
+            for a in &findings {
+                let cat = a.metadata.get("category").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let muts: Vec<String> = a
+                    .metadata
+                    .get("mutations")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+                    .unwrap_or_default();
+                let toks = a.metadata.get("tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                let severity = makhalib::report::severity(
+                    a.metadata.get("success_rate").and_then(|v| v.as_f64()).unwrap_or(1.0),
+                    true,
+                )
+                .to_string();
+                let mut caught: Option<String> = None;
+                for (method, view) in makhalib::harden::normalized_views(&a.prompt) {
+                    if let Ok(msgs) = gen.generate(&makhalib::core::Conversation::from_prompt(view.clone()), 1).await {
+                        let mut probe = makhalib::core::Attempt::new(view);
+                        probe.outputs.clear();
                         for m in msgs {
-                            a.add_output(m.content);
+                            probe.add_output(m.content);
                         }
-                        let scores = detector.detect(&a).await.unwrap_or_default();
-                        let max = scores.iter().copied().fold(0.0_f64, f64::max);
-                        if max <= 0.5 {
-                            hit = Some(method);
+                        let scores = detector.detect(&probe).await.unwrap_or_default();
+                        if scores.iter().copied().fold(0.0_f64, f64::max) <= 0.5 {
+                            caught = Some(method);
                             break;
                         }
                     }
                 }
-                match hit {
-                    Some(m) => {
-                        caught += 1;
-                        *by_method.entry(m).or_default() += 1;
-                    }
-                    None => residual.push((cat.clone(), text.clone())),
+                let control = makhalib::harden::control_for(caught.as_deref());
+                rows.push((a.id.clone(), cat, severity, muts, toks, caught, control, a.prompt.clone()));
+            }
+            rows.sort_by_key(|r| makhalib::harden::severity_rank(&r.2));
+
+            // --- Metrics -----------------------------------------------------
+            let total = rows.len();
+            let caught_n = rows.iter().filter(|r| r.5.is_some()).count();
+            let residual_n = total - caught_n;
+            let rate = |n: usize| if total > 0 { 100.0 * n as f64 / total as f64 } else { 0.0 };
+            let tokens_total: u64 = rows.iter().map(|r| r.4).sum();
+            let tokens_per_finding = if total > 0 { tokens_total as f64 / total as f64 } else { 0.0 };
+            let mut sev: BTreeMap<String, usize> = BTreeMap::new();
+            let mut by_mut: BTreeMap<String, usize> = BTreeMap::new();
+            let mut by_control: BTreeMap<String, usize> = BTreeMap::new();
+            for r in &rows {
+                *sev.entry(r.2.clone()).or_default() += 1;
+                for m in &r.3 {
+                    *by_mut.entry(m.clone()).or_default() += 1;
                 }
+                *by_control.entry(r.6.to_string()).or_default() += 1;
             }
 
-            let total = bypasses.len();
-            let rate = if total > 0 { 100.0 * caught as f64 / total as f64 } else { 0.0 };
             let mut md = String::new();
-            md.push_str("# Guardrail Hardening Projection — normalize-then-classify\n\n");
-            md.push_str(&format!("- **Target:** {endpoint} ({format})\n"));
-            md.push_str(&format!("- **Confirmed bypasses:** {total}\n"));
-            md.push_str(&format!("- **Would be caught by normalize-then-classify: {caught} ({rate:.1}%)**\n\n"));
-            md.push_str("## Caught, by normalization\n\n| Normalization | Bypasses it catches |\n|---|---:|\n");
-            for (m, n) in &by_method {
-                md.push_str(&format!("| {m} | {n} |\n"));
+            md.push_str("# Hardening & remediation report\n\n");
+            md.push_str(&format!("- **Target:** {endpoint} ({format})\n- **Authorized scope:** {scope}\n"));
+            md.push_str(&format!("- **Confirmed findings:** {total}\n"));
+            md.push_str(&format!("- **Closed by a normalization control: {caught_n} ({:.1}%)**\n", rate(caught_n)));
+            md.push_str(&format!("- **Residual (needs anomaly filter / human review): {residual_n} ({:.1}%)**\n", rate(residual_n)));
+            md.push_str(&format!("- **Tokens spent per finding:** {tokens_per_finding:.0} (total {tokens_total})\n\n"));
+            md.push_str("## Severity\n\n| Severity | Findings |\n|---|---:|\n");
+            for (k, v) in &sev {
+                md.push_str(&format!("| {k} | {v} |\n"));
             }
-            md.push_str(&format!("\n## Residual — not closed by these views ({})\n\n", residual.len()));
-            for (cat, text) in &residual {
-                let t: String = text.chars().take(80).collect();
-                md.push_str(&format!("- `{cat}` — {t}\n"));
+            md.push_str("\n## Obfuscation that produced findings\n\n| Mutation | Findings |\n|---|---:|\n");
+            for (k, v) in &by_mut {
+                md.push_str(&format!("| {k} | {v} |\n"));
             }
-            md.push_str("\n## Recommendation\n\nScore the **max over** {original, lower, de-leetspeak, strip-invisible, confusable-fold, reverse, rot13, base64-decode}; add a chars-per-token anomaly filter (Broken-Token) for the residual.\n");
-            let path = run.join("harden.md");
-            std::fs::write(&path, &md)?;
-            println!("\n=== hardening projection ===");
-            println!("would be caught: {caught}/{total} ({rate:.1}%)");
-            for (m, n) in &by_method {
-                println!("  {m:<18} catches {n}");
+            md.push_str("\n## Remediation per finding (most severe first)\n\n");
+            md.push_str("| ID | Severity | Category | Mutations | Control |\n|---|---|---|---|---|\n");
+            for r in &rows {
+                md.push_str(&format!(
+                    "| `{}` | {} | {} | {} | {} |\n",
+                    &r.0[..8.min(r.0.len())],
+                    r.2,
+                    r.1,
+                    if r.3.is_empty() { "—".to_string() } else { r.3.join(", ") },
+                    r.6
+                ));
             }
-            println!("  wrote {}", path.display());
+            md.push_str("\n## Recommended guardrail change\n\nScore the **max over** the original and these normalized views: lowercase, de-leetspeak, strip invisible characters, confusable folding, reverse, rot13, base64-decode. Keep a chars-per-token anomaly filter for the residual findings, and add every finding to the regression set so it cannot return silently.\n");
+            let md_path = run.join("remediation.md");
+            std::fs::write(&md_path, &md)?;
+
+            let mut csv = String::from("id,severity,category,mutations,tokens,closed_by,control,prompt\n");
+            for r in &rows {
+                let esc = |t: &str| format!("\"{}\"", t.replace('"', "\"\""));
+                csv.push_str(&format!(
+                    "{},{},{},{},{},{},{},{}\n",
+                    r.0,
+                    r.2,
+                    r.1,
+                    esc(&r.3.join(";")),
+                    r.4,
+                    r.5.clone().unwrap_or_else(|| "none".into()),
+                    esc(r.6),
+                    esc(&r.7)
+                ));
+            }
+            let csv_path = run.join("remediation.csv");
+            std::fs::write(&csv_path, csv)?;
+
+            let metrics = serde_json::json!({
+                "findings": total,
+                "closed_by_normalization": caught_n,
+                "residual": residual_n,
+                "closed_rate": rate(caught_n) / 100.0,
+                "tokens_total": tokens_total,
+                "tokens_per_finding": tokens_per_finding,
+                "by_severity": sev,
+                "by_mutation": by_mut,
+                "by_control": by_control,
+            });
+            std::fs::write(run.join("metrics.json"), serde_json::to_string_pretty(&metrics)?)?;
+
+            println!("\n=== remediation metrics ===");
+            println!("closed by normalization: {caught_n}/{total} ({:.1}%)", rate(caught_n));
+            println!("residual:                {residual_n}/{total} ({:.1}%)", rate(residual_n));
+            println!("tokens per finding:      {tokens_per_finding:.0}");
+            for (k, v) in &sev {
+                println!("  severity {k:<9} {v}");
+            }
+            for (k, v) in &by_control {
+                println!("  control: {v} × {k}");
+            }
+            println!("  wrote {}", md_path.display());
+            println!("  wrote {}", csv_path.display());
+            println!("  wrote {}", run.join("metrics.json").display());
             Ok(())
         }
         Cmd::Watch { run, interval_ms } => {

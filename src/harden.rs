@@ -142,3 +142,48 @@ mod tests {
         assert!(views.iter().all(|(_, v)| v != "Vtaber nyy cerivbhf"));
     }
 }
+
+/// Defensive control that would close a finding, given the normalization that
+/// catches it (`None` = no normalization catches it). This is the remediation
+/// text a defender applies to the guardrail.
+pub fn control_for(method: Option<&str>) -> &'static str {
+    match method {
+        Some("lower") => "Case-fold the input before scoring",
+        Some("deleet") => "De-leetspeak the input (map 4/3/1/0/5/7 back to letters) before scoring",
+        Some("strip_invisible") => "Strip zero-width, bidi and variation-selector characters before scoring",
+        Some("defold_homoglyph") => "Fold confusable (homoglyph) characters to Latin before scoring",
+        Some("reverse") => "Also score the reversed input (catch reversed payloads)",
+        Some("rot13") => "Also score the rot13-decoded input",
+        Some("b64decode") => "Decode base64 segments and score the decoded text",
+        _ => "No single normalization catches it: add a chars-per-token anomaly filter and route to human review",
+    }
+}
+
+/// Risk-based severity order, used to sort findings for the remediation list.
+pub fn severity_rank(severity: &str) -> u8 {
+    match severity {
+        "Critical" => 0,
+        "High" => 1,
+        "Medium" => 2,
+        _ => 3,
+    }
+}
+
+#[cfg(test)]
+mod control_tests {
+    use super::*;
+
+    #[test]
+    fn every_normalization_has_a_control() {
+        for m in ["lower", "deleet", "strip_invisible", "defold_homoglyph", "reverse", "rot13", "b64decode"] {
+            assert!(!control_for(Some(m)).starts_with("No single"));
+        }
+        assert!(control_for(None).starts_with("No single"));
+    }
+
+    #[test]
+    fn critical_sorts_first() {
+        assert!(severity_rank("Critical") < severity_rank("High"));
+        assert!(severity_rank("High") < severity_rank("Low"));
+    }
+}
