@@ -109,6 +109,27 @@ enum Cmd {
         #[arg(long, default_value_t = 500)]
         interval_ms: u64,
     },
+    /// Serve the read-only MCP server (stdio) over exported run reports.
+    Mcp {
+        #[arg(long, default_value = "out")]
+        reports: PathBuf,
+    },
+    /// Statically scan a model file without loading it (pickle / safetensors / zip).
+    ScanArtifact {
+        /// Path to the model file.
+        file: PathBuf,
+    },
+    /// Turn a natural-language request into a validated scan plan (YAML).
+    Plan {
+        #[arg(long, default_value = "ollama")]
+        provider: String,
+        #[arg(long)]
+        model: String,
+        #[arg(long)]
+        base_url: Option<String>,
+        /// The request, e.g. "test my guardrail for injection, be thorough".
+        request: String,
+    },
     /// Serve the read-only results dashboard for exported runs.
     Ui {
         #[arg(long, default_value_t = 8088)]
@@ -607,6 +628,32 @@ async fn main() -> makhalib::Result<()> {
                 std::thread::sleep(std::time::Duration::from_millis(interval_ms));
             }
             println!("-- run finished · {since} events --");
+            Ok(())
+        }
+        Cmd::Mcp { reports } => {
+            makhalib::mcp::serve(&reports)?;
+            Ok(())
+        }
+        Cmd::ScanArtifact { file } => {
+            let bytes = std::fs::read(&file)?;
+            let report = makhalib::artifact::scan(&bytes);
+            println!("{}", serde_json::to_string_pretty(&report)?);
+            if report.verdict == "reject" {
+                std::process::exit(1);
+            }
+            Ok(())
+        }
+        Cmd::Plan { provider, model, base_url, request } => {
+            let brain = makhalib::llm::build(&makhalib::llm::LlmConfig {
+                provider,
+                model,
+                base_url,
+                host: None,
+                api_key: None,
+                api_key_env: None,
+            })?;
+            let plan = makhalib::planner::plan_from_request(brain.as_ref(), &request).await?;
+            println!("{}", makhalib::planner::render_plan_yaml(&plan)?);
             Ok(())
         }
         Cmd::Ui { port, reports, dist } => {
