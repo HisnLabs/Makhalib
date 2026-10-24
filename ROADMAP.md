@@ -183,9 +183,11 @@ Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to 
   embeddings of every attempt/outcome for adaptive recall and **resumable, persistent campaigns**
   across runs and machines.
 
-> Defensive add-ons under evaluation: shipping Makhalib's guardrail-hardening guidance as **Claude
-> Skills + an MCP server + an agent** so a defender can wire Makhalib's findings straight into
-> their own guardrail/agent pipeline.
+- **P16 — Defender (Skill + MCP + agent).** Close the loop from finding to fix: a `makhalib-harden`
+  **Claude Skill** (normalize-then-classify + chars-per-token anomaly filter), an **MCP server**
+  exposing `redteam_guardrail` / `get_findings` / `verify_fix`, and a **defender agent** that proposes
+  a guardrail fix, (human-approved) applies it, and **re-tests differentially** to prove the bypass is
+  closed without raising false-blocks. Spec: [`docs/DEFENDER.md`](docs/DEFENDER.md).
 
 ## Status
 - [x] P0 Foundation — domain types, typed registry *(tested)*
@@ -206,3 +208,4 @@ Toward "the best security tool for LLMs & guardrails" — benchmarked, cheap to 
 - [ ] P13 Threat-intel feed (arXiv + zero-day disclosures → probe catalog)
 - [ ] P14 Malware & artifact signature DB (YARA)
 - [ ] P15 Redis vector memory (resumable, persistent campaigns)
+- [ ] P16 Defender (Skill + MCP + agent) — find → fix → re-verify loop (spec: docs/DEFENDER.md)
