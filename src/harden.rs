@@ -187,3 +187,43 @@ mod control_tests {
         assert!(severity_rank("High") < severity_rank("Low"));
     }
 }
+
+/// System and user prompts for the LLM that writes a defensive control for one
+/// finding. The prompt carries only the category, the obfuscation names and the
+/// normalization that caught the finding, never the attack text itself.
+pub fn remediation_prompt(category: &str, mutations: &[String], caught_by: Option<&str>) -> (String, String) {
+    let system = "You are a defensive security engineer hardening an AI guardrail. \
+Reply with one concrete control the guardrail should add, in two sentences at most. \
+Do not write or repeat any attack text."
+        .to_string();
+    let obfuscation = if mutations.is_empty() { "none".to_string() } else { mutations.join(", ") };
+    let caught = caught_by.unwrap_or("no single normalization catches it");
+    let user = format!(
+        "Finding: the guardrail failed to flag a {category} attack.\n\
+         Obfuscation used by the attack: {obfuscation}.\n\
+         Normalization that would catch it: {caught}.\n\
+         Describe the defensive control to add to the guardrail."
+    );
+    (system, user)
+}
+
+#[cfg(test)]
+mod prompt_tests {
+    use super::*;
+
+    #[test]
+    fn prompt_describes_finding_without_payload() {
+        let (sys, user) = remediation_prompt("direct_injection", &["rot13".to_string()], Some("rot13"));
+        assert!(sys.contains("Do not write or repeat any attack text"));
+        assert!(user.contains("direct_injection"));
+        assert!(user.contains("rot13"));
+        assert!(!user.contains("Ignore"));
+    }
+
+    #[test]
+    fn prompt_handles_no_mutation_and_no_catch() {
+        let (_, user) = remediation_prompt("prompt_extraction", &[], None);
+        assert!(user.contains("Obfuscation used by the attack: none"));
+        assert!(user.contains("no single normalization catches it"));
+    }
+}

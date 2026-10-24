@@ -84,6 +84,13 @@ enum Cmd {
     Harden {
         #[arg(long, default_value = "http://localhost:8787/v1/inspect")]
         endpoint: String,
+        /// LLM that writes each defensive control (ollama | openai | anthropic | gemini | openai-compatible).
+        #[arg(long = "llm-provider", default_value = "ollama")]
+        llm_provider: String,
+        #[arg(long = "llm-model", default_value = "qwen2.5:7b")]
+        llm_model: String,
+        #[arg(long = "llm-base-url")]
+        llm_base_url: Option<String>,
         #[arg(long, default_value = "inspect")]
         format: String,
         /// A prior run's output directory (containing results.jsonl).
@@ -408,7 +415,7 @@ async fn main() -> makhalib::Result<()> {
             }
             Ok(())
         }
-        Cmd::Harden { endpoint, format, run, scope } => {
+        Cmd::Harden { endpoint, llm_provider, llm_model, llm_base_url, format, run, scope } => {
             let scope = match scope {
                 Some(s) if !s.trim().is_empty() => s,
                 _ => {
@@ -432,10 +439,19 @@ async fn main() -> makhalib::Result<()> {
                 "inspect" => Arc::new(makhalib::inspect::InspectBypassDetector),
                 _ => Arc::new(GuardrailBypassDetector::default()),
             };
+            let brain = makhalib::llm::build(&makhalib::llm::LlmConfig {
+                provider: llm_provider.clone(),
+                model: llm_model.clone(),
+                base_url: llm_base_url.clone(),
+                host: None,
+                api_key: None,
+                api_key_env: None,
+            })?;
+            println!("remediation brain: {} ({})", brain.name(), llm_provider);
 
             use std::collections::BTreeMap;
-            // Per finding: (id, category, severity, mutations, tokens, caught_by, control, prompt)
-            let mut rows: Vec<(String, String, String, Vec<String>, u64, Option<String>, &'static str, String)> = Vec::new();
+            // Per finding: (id, category, severity, mutations, tokens, caught_by, control, prompt, source)
+            let mut rows: Vec<(String, String, String, Vec<String>, u64, Option<String>, String, String, &'static str)> = Vec::new();
             for a in &findings {
                 let cat = a.metadata.get("category").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 let muts: Vec<String> = a
@@ -465,8 +481,12 @@ async fn main() -> makhalib::Result<()> {
                         }
                     }
                 }
-                let control = makhalib::harden::control_for(caught.as_deref());
-                rows.push((a.id.clone(), cat, severity, muts, toks, caught, control, a.prompt.clone()));
+                let (sys, user) = makhalib::harden::remediation_prompt(&cat, &muts, caught.as_deref());
+                let (control, source) = match brain.chat(Some(&sys), &user).await {
+                    Ok(text) if !text.trim().is_empty() => (text.trim().to_string(), "llm"),
+                    _ => (makhalib::harden::control_for(caught.as_deref()).to_string(), "rule-fallback"),
+                };
+                rows.push((a.id.clone(), cat, severity, muts, toks, caught, control, a.prompt.clone(), source));
             }
             rows.sort_by_key(|r| makhalib::harden::severity_rank(&r.2));
 
@@ -485,7 +505,7 @@ async fn main() -> makhalib::Result<()> {
                 for m in &r.3 {
                     *by_mut.entry(m.clone()).or_default() += 1;
                 }
-                *by_control.entry(r.6.to_string()).or_default() += 1;
+                *by_control.entry(r.8.to_string()).or_default() += 1;
             }
 
             let mut md = String::new();
@@ -519,18 +539,19 @@ async fn main() -> makhalib::Result<()> {
             let md_path = run.join("remediation.md");
             std::fs::write(&md_path, &md)?;
 
-            let mut csv = String::from("id,severity,category,mutations,tokens,closed_by,control,prompt\n");
+            let mut csv = String::from("id,severity,category,mutations,tokens,closed_by,control,control_source,prompt\n");
             for r in &rows {
                 let esc = |t: &str| format!("\"{}\"", t.replace('"', "\"\""));
                 csv.push_str(&format!(
-                    "{},{},{},{},{},{},{},{}\n",
+                    "{},{},{},{},{},{},{},{},{}\n",
                     r.0,
                     r.2,
                     r.1,
                     esc(&r.3.join(";")),
                     r.4,
                     r.5.clone().unwrap_or_else(|| "none".into()),
-                    esc(r.6),
+                    esc(&r.6),
+                    r.8,
                     esc(&r.7)
                 ));
             }
