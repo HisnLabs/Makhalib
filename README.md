@@ -129,6 +129,30 @@ Honest status — what runs now versus what's still on the [roadmap](./ROADMAP.m
 
 ---
 
+## 🧪 Models tested with Makhalib (point-in-time)
+
+Local Ollama models were run through the Guardrino gateway (`/v1/inspect`, L1+L2) with Makhalib's seed
+prompts. Each prompt was sent as `input`, each model reply as `output`. Run date 24 Oct 2026, temperature 0,
+replies capped at 160 tokens, 23 unique seed prompts per model.
+
+| Model | Replies allowed by the gateway | Replies blocked | Notes |
+|---|---:|---:|---|
+| `qwen2.5:7b` | 4 / 23 | 19 / 23 | Many harmless decoding replies were blocked (possible output over-blocking). |
+| `llama3.1:8b` | 14 / 23 | 9 / 23 | Some compliant replies to injections were allowed (for example "Developer Mode" acceptance). |
+| `mistral:7b-instruct-q4_0` | 18 / 23 | 5 / 23 | Most replies allowed, including some injection-compliant ones. |
+
+Prompts: 16 of 23 blocked at input (the same for every model, since the input check does not use the model).
+
+**What this means:** the gateway's output-side checks did not reliably stop model compliance with injection
+prompts in this run, and they blocked some harmless replies. This is a snapshot of one seed set. It is not a
+certification, and it does not show that any model is safe. The follow-up work is to review the output-side
+rules and re-run the same test after changes.
+
+Reproduce: `out/ollama-inspect/run.py` (local, not published, because the replies can contain
+attack-like text).
+
+---
+
 ## 🛠️ How it works
 
 ```mermaid
