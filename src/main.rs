@@ -136,6 +136,13 @@ enum Cmd {
         #[arg(long)]
         dir: PathBuf,
     },
+    /// Convert an augustus-format catalog into Makhalib probe specs (local output only).
+    CatalogConvert {
+        #[arg(long)]
+        from: PathBuf,
+        #[arg(long, default_value = "out/catalog-native")]
+        out: PathBuf,
+    },
     /// Write canary carrier files (plain, invisible, PDF, PNG) to test whether text is read.
     Carriers {
         #[arg(long, default_value = "CANARY-TEST-0001")]
@@ -675,6 +682,14 @@ async fn main() -> makhalib::Result<()> {
             for e in &entries {
                 println!("{:<40} detector={:<22} severity={:<8} prompts={}", e.id, e.detector, e.severity, e.prompts.len());
             }
+            for (file, reason) in &rejected {
+                eprintln!("rejected {file}: {reason}");
+            }
+            Ok(())
+        }
+        Cmd::CatalogConvert { from, out } => {
+            let (written, rejected) = makhalib::catalog::convert_dir(&from, &out).map_err(|e| e.to_string())?;
+            println!("converted {} probe specs into {}", written.len(), out.display());
             for (file, reason) in &rejected {
                 eprintln!("rejected {file}: {reason}");
             }

@@ -105,6 +105,34 @@ pub fn load_dir(dir: &Path) -> (Vec<CatalogEntry>, Vec<(String, String)>) {
     (ok, bad)
 }
 
+/// Converts a catalog entry into Makhalib's native probe spec YAML, which
+/// `probes::ProbeSpec::from_yaml` loads. The output is the operator's local copy.
+pub fn to_probe_spec_yaml(entry: &CatalogEntry) -> Result<String, String> {
+    let spec = crate::probes::ProbeSpec {
+        name: entry.id.clone(),
+        description: if entry.name.is_empty() { entry.id.clone() } else { entry.name.clone() },
+        goal: entry.goal.clone(),
+        prompts: entry.prompts.clone(),
+        detector: if entry.detector.is_empty() { None } else { Some(entry.detector.clone()) },
+    };
+    serde_yaml::to_string(&spec).map_err(|e| format!("{}: {e}", entry.id))
+}
+
+/// Converts every entry under `from` into a probe spec file under `out`.
+/// Returns the written paths and any rejected source files.
+pub fn convert_dir(from: &Path, out: &Path) -> Result<(Vec<std::path::PathBuf>, Vec<(String, String)>), String> {
+    let (entries, rejected) = load_dir(from);
+    fs::create_dir_all(out).map_err(|e| e.to_string())?;
+    let mut written = Vec::new();
+    for e in &entries {
+        let yaml = to_probe_spec_yaml(e)?;
+        let file = out.join(format!("{}.yaml", e.id.replace(['/', '\\'], "_")));
+        fs::write(&file, yaml).map_err(|e| e.to_string())?;
+        written.push(file);
+    }
+    Ok((written, rejected))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,6 +178,29 @@ prompts:
         let (ok, bad) = load_dir(&root);
         assert_eq!(ok.len(), 1);
         assert_eq!(bad.len(), 1);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn converted_spec_loads_as_native_probe() {
+        let e = parse_template(SAMPLE, "fixture.yaml").unwrap();
+        let yaml = to_probe_spec_yaml(&e).unwrap();
+        let spec = crate::probes::ProbeSpec::from_yaml(&yaml).unwrap();
+        assert_eq!(spec.name, "example.Placeholder");
+        assert_eq!(spec.detector.as_deref(), Some("refusal.Refusal"));
+        assert_eq!(spec.prompts.len(), 2);
+    }
+
+    #[test]
+    fn convert_dir_writes_one_spec_per_entry() {
+        let root = std::env::temp_dir().join(format!("mkb-conv-{}", std::process::id()));
+        let src = root.join("src");
+        fs::create_dir_all(&src).unwrap();
+        fs::write(src.join("ok.yaml"), SAMPLE).unwrap();
+        let out = root.join("out");
+        let (written, rejected) = convert_dir(&src, &out).unwrap();
+        assert_eq!(written.len(), 1);
+        assert!(rejected.is_empty());
         let _ = fs::remove_dir_all(&root);
     }
 }

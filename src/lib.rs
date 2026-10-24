@@ -27,6 +27,7 @@ pub mod artifact;
 pub mod intel;
 pub mod mcp;
 pub mod planner;
+pub mod extract;
 pub mod plan;
 pub mod taxonomy;
 pub mod probes;
@@ -34,7 +35,9 @@ pub mod progress;
 pub mod registry;
 pub mod report;
 pub mod scanner;
+pub mod toxicity;
 pub mod traits;
+pub mod triage;
 pub mod ui_server;
 
 /// Boxed, thread-safe error used across async trait boundaries.
